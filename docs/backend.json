@@ -1,0 +1,73 @@
+
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Personal and medical details of the user.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "motherName": { "type": "string" },
+        "disabilityType": { "type": "string" },
+        "bloodGroup": { "type": "string" },
+        "insuranceId": { "type": "string" },
+        "profileImage": { "type": "string" },
+        "contacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "phone": { "type": "string" },
+              "relation": { "type": "string" },
+              "isPrimary": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "EmergencyContact": {
+      "title": "Emergency Contact",
+      "description": "Trusted contact to be notified during SOS.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "relation": { "type": "string" },
+        "isPrimary": { "type": "boolean" }
+      },
+      "required": ["name", "phone"]
+    },
+    "UserSettings": {
+      "title": "User Settings",
+      "description": "App configuration and preferences.",
+      "type": "object",
+      "properties": {
+        "voiceSos": { "type": "boolean" },
+        "shakeSos": { "type": "boolean" },
+        "largeText": { "type": "boolean" },
+        "darkMode": { "type": "boolean" },
+        "voiceGuidance": { "type": "boolean" },
+        "shareMedical": { "type": "boolean" },
+        "notifications": { "type": "boolean" },
+        "sosMessage": { "type": "string" }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["google.com", "phone"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user profile information including contacts array."
+    },
+    "/users/{userId}/settings/default": {
+      "schema": "UserSettings",
+      "description": "Stores user settings."
+    }
+  }
+}

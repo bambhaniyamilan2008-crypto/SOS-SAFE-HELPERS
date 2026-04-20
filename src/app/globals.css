@@ -1,0 +1,126 @@
+@import "leaflet/dist/leaflet.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Default Light Theme */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 5%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 5%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 5%;
+    --primary: 0 100% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 90%;
+    --secondary-foreground: 0 0% 5%;
+    --muted: 0 0% 93%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 0 100% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 85%;
+    --input: 0 0% 85%;
+    --ring: 0 100% 45%;
+    --radius: 1.25rem;
+  }
+
+  .dark {
+    /* Dark Theme Overrides */
+    --background: 0 0% 5%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 0 100% 60%;
+    --accent-foreground: 0 0% 100%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 0 100% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body transition-colors duration-300 min-h-screen overflow-y-auto;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline;
+  }
+}
+
+.glow-primary {
+  box-shadow: 0 0 30px hsla(0, 100%, 50%, 0.5);
+}
+
+.glow-accent {
+  box-shadow: 0 0 25px hsla(0, 100%, 60%, 0.4);
+}
+
+.pulse-primary {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 hsla(0, 100%, 50%, 0.7); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 25px hsla(0, 100%, 50%, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 hsla(0, 100%, 50%, 0); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.animate-blink {
+  animation: blink 1s infinite;
+}
+
+.sos-gradient {
+  background: radial-gradient(circle at center, hsl(0, 100%, 50%), hsl(0, 100%, 30%));
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 12s linear infinite;
+}
+
+/* Leaflet Customizations */
+.leaflet-container {
+  background-color: hsl(var(--card)) !important;
+}
+
+.leaflet-control-zoom {
+  border: none !important;
+  margin-bottom: 120px !important;
+}
+
+.leaflet-control-zoom-in, .leaflet-control-zoom-out {
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 12px !important;
+  margin-bottom: 4px !important;
+}
+
+.leaflet-bar {
+  border: none !important;
+}

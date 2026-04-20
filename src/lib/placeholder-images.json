@@ -1,0 +1,22 @@
+{
+  "placeholderImages": [
+    {
+      "id": "onboarding-1",
+      "description": "SafeHelp Onboarding 1",
+      "imageUrl": "https://picsum.photos/seed/safehelp1/600/400",
+      "imageHint": "safety assistance"
+    },
+    {
+      "id": "onboarding-2",
+      "description": "SafeHelp Onboarding 2",
+      "imageUrl": "https://picsum.photos/seed/safehelp2/600/400",
+      "imageHint": "family connection"
+    },
+    {
+      "id": "onboarding-3",
+      "description": "SafeHelp Onboarding 3",
+      "imageUrl": "https://picsum.photos/seed/safehelp3/600/400",
+      "imageHint": "emergency signal"
+    }
+  ]
+}
