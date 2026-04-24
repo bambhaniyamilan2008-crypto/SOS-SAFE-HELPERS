@@ -7,7 +7,7 @@ import { AppScreen } from "../SafeHelpApp";
 import { 
   ArrowLeft, Moon, Type, MessageCircle, Mic, Zap, 
   Settings as SettingsIcon,
-  ChevronRight, UserCircle, LogOut, Globe
+  ChevronRight, UserCircle, LogOut, Globe, Sliders
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -48,6 +48,7 @@ export default function Settings({ navigateTo, lang, setLang, t }: SettingsProps
   const [settings, setSettings] = useState({
     voiceSos: true,
     shakeSos: true,
+    shakeSensitivity: "high",
     largeText: false,
     darkMode: false,
     voiceGuidance: false,
@@ -188,6 +189,30 @@ export default function Settings({ navigateTo, lang, setLang, t }: SettingsProps
             />
             <SettingItem icon={Zap} title="Shake SOS" desc="Trigger on movement" checked={settings.shakeSos} onToggle={(v: boolean) => updateSetting('shakeSos', v)} />
           </div>
+          
+          {settings.shakeSos && (
+            <div className="space-y-3 px-2 pt-2">
+              <div className="flex items-center space-x-2"><Sliders className="w-4 h-4 text-primary" /><h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t.sensitivity}</h3></div>
+              <div className="grid grid-cols-3 gap-2 bg-secondary/20 p-1.5 rounded-2xl">
+                {[
+                  { id: 'low', label: t.low },
+                  { id: 'medium', label: t.medium },
+                  { id: 'high', label: t.high }
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => updateSetting('shakeSensitivity', opt.id)}
+                    className={cn(
+                      "py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all",
+                      settings.shakeSensitivity === opt.id ? "bg-primary text-white shadow-md" : "text-muted-foreground"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-4">

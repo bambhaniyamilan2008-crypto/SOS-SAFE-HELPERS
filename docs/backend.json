@@ -48,6 +48,7 @@
       "properties": {
         "voiceSos": { "type": "boolean" },
         "shakeSos": { "type": "boolean" },
+        "shakeSensitivity": { "type": "string", "enum": ["low", "medium", "high"] },
         "largeText": { "type": "boolean" },
         "darkMode": { "type": "boolean" },
         "voiceGuidance": { "type": "boolean" },

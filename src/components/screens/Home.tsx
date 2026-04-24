@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { AppScreen } from "../SafeHelpApp";
 import { 
@@ -15,7 +15,8 @@ import {
   ArrowRight,
   Mic,
   Zap,
-  MessageSquare
+  MessageSquare,
+  ShieldAlert
 } from "lucide-react";
 import { useUser, useFirestore, useDoc } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
@@ -34,6 +35,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   const db = useFirestore();
   const { toast } = useToast();
   const [shakeEnabled, setShakeEnabled] = useState(false);
+  const [shakeStatus, setShakeStatus] = useState<"idle" | "detected" | "triggered">("idle");
 
   const userRef = useMemo(() => {
     if (!user || !db) return null;
@@ -118,49 +120,78 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     }
   };
 
-  // Shake Detection Logic
-  useEffect(() => {
-    if (!shakeEnabled) return;
+  // 🔹 Advanced Shake Detection System
+  const shakeStartTimeRef = useRef<number>(0);
+  const cooldownRef = useRef<number>(0);
 
-    let lastUpdate = 0;
-    let lastX = 0, lastY = 0, lastZ = 0;
-    const SHAKE_THRESHOLD = 30;
-    let lastTriggerTime = 0;
+  useEffect(() => {
+    if (!shakeEnabled || isSOSActive) return;
+
+    // Threshold mapping based on sensitivity settings
+    const SENSITIVITY_THRESHOLDS: Record<string, number> = {
+      low: 15,
+      medium: 25,
+      high: 35
+    };
+    
+    const threshold = SENSITIVITY_THRESHOLDS[settings?.shakeSensitivity || "high"] || 35;
+    const SHAKE_WINDOW_MS = 500; // Continuous shake required for 0.5s
+    const COOLDOWN_MS = 3000;    // Ignore shakes for 3s after trigger
 
     const handleMotion = (event: DeviceMotionEvent) => {
       const acceleration = event.accelerationIncludingGravity;
       if (!acceleration) return;
 
-      const curTime = Date.now();
-      if ((curTime - lastTriggerTime) < 3000) return;
+      const now = Date.now();
+      
+      // 1. Check cooldown
+      if (now < cooldownRef.current) return;
 
-      if ((curTime - lastUpdate) > 100) {
-        const diffTime = curTime - lastUpdate;
-        lastUpdate = curTime;
+      // 2. Calculate Total Force: |x| + |y| + |z|
+      const x = Math.abs(acceleration.x || 0);
+      const y = Math.abs(acceleration.y || 0);
+      const z = Math.abs(acceleration.z || 0);
+      const totalForce = x + y + z;
 
-        const x = acceleration.x || 0;
-        const y = acceleration.y || 0;
-        const z = acceleration.z || 0;
-
-        const speed = Math.abs(x + y + z - lastX - lastY - lastZ) / diffTime * 10000;
-
-        if (speed > SHAKE_THRESHOLD) {
-          lastTriggerTime = curTime;
-          if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            navigator.vibrate([300, 100, 300]);
-          }
-          navigateTo("sos-activation");
+      // 3. Shake Detection Logic
+      if (totalForce > threshold) {
+        // First detected shake in a potential sequence
+        if (shakeStartTimeRef.current === 0) {
+          shakeStartTimeRef.current = now;
+          setShakeStatus("detected");
         }
 
-        lastX = x;
-        lastY = y;
-        lastZ = z;
+        // Check if shake has been continuous for 500ms
+        if (now - shakeStartTimeRef.current >= SHAKE_WINDOW_MS) {
+          cooldownRef.current = now + COOLDOWN_MS; // Start cooldown
+          shakeStartTimeRef.current = 0;
+          setShakeStatus("triggered");
+          
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate([400, 100, 400]);
+          }
+          
+          toast({
+            variant: "destructive",
+            title: t.emergencyActivated,
+            description: "Shake intensity confirmed."
+          });
+          
+          navigateTo("sos-activation");
+        }
+      } else {
+        // Reset if shake intensity drops below threshold
+        shakeStartTimeRef.current = 0;
+        setShakeStatus("idle");
       }
     };
 
     window.addEventListener('devicemotion', handleMotion);
-    return () => window.removeEventListener('devicemotion', handleMotion);
-  }, [shakeEnabled, navigateTo]);
+    return () => {
+      window.removeEventListener('devicemotion', handleMotion);
+      shakeStartTimeRef.current = 0;
+    };
+  }, [shakeEnabled, settings?.shakeSensitivity, isSOSActive, navigateTo, t, toast]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background relative overflow-y-auto">
@@ -187,12 +218,24 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
         
         <div className="flex flex-col items-center">
           <div className={cn(
-            "px-4 py-1.5 rounded-full flex items-center space-x-2 border shadow-sm",
-            isSOSActive ? "bg-primary/10 border-primary/20" : "bg-green-500/10 border-green-500/20"
+            "px-4 py-1.5 rounded-full flex items-center space-x-2 border shadow-sm transition-all",
+            isSOSActive ? "bg-primary/10 border-primary/20" : 
+            shakeStatus === "detected" ? "bg-orange-500/10 border-orange-500/20" :
+            "bg-green-500/10 border-green-500/20"
           )}>
-            <div className={cn("w-2 h-2 rounded-full", isSOSActive ? 'bg-primary animate-pulse' : 'bg-green-500')}></div>
-            <span className={cn("text-[10px] font-bold tracking-widest uppercase", isSOSActive ? 'text-primary' : 'text-green-500')}>
-              {isSOSActive ? t.sosActive : t.systemSafe}
+            <div className={cn(
+              "w-2 h-2 rounded-full", 
+              isSOSActive ? 'bg-primary animate-pulse' : 
+              shakeStatus === "detected" ? 'bg-orange-500 animate-bounce' :
+              'bg-green-500'
+            )}></div>
+            <span className={cn(
+              "text-[10px] font-bold tracking-widest uppercase", 
+              isSOSActive ? 'text-primary' : 
+              shakeStatus === "detected" ? 'text-orange-500' :
+              'text-green-500'
+            )}>
+              {isSOSActive ? t.sosActive : shakeStatus === "detected" ? t.shakeDetected : t.systemSafe}
             </span>
           </div>
         </div>
@@ -279,7 +322,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
           </button>
         </div>
 
-        {/* Shake SOS Toggle at bottom */}
+        {/* Advanced Shake SOS Toggle at bottom */}
         <div className="w-full flex flex-col items-center space-y-3 pt-6 pb-4">
           <button 
             onClick={() => toggleShake(!shakeEnabled)}
@@ -296,7 +339,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
                 {t.shakeSos}
               </span>
               <span className={cn("text-[10px] font-bold uppercase opacity-80", shakeEnabled ? "text-white/90" : "text-muted-foreground/80")}>
-                {shakeEnabled ? t.activeDetection : t.sensorDisabled}
+                {shakeEnabled ? `${t.activeDetection} (${t[settings?.shakeSensitivity || 'high']})` : t.sensorDisabled}
               </span>
             </div>
           </button>
