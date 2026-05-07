@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
@@ -48,6 +47,9 @@ export default function Profile({ navigateTo }: ProfileProps) {
   const [isDisabilitySheetOpen, setIsDisabilitySheetOpen] = useState(false);
   const [isBloodSheetOpen, setIsBloodSheetOpen] = useState(false);
   
+  // 🔥 CACHE ENGINE STATE: Check karega ki phone ki memory mein data hai ya nahi
+  const [hasCachedData, setHasCachedData] = useState(false);
+  
   const userRef = useMemo(() => {
     if (!user || !db) return null;
     return doc(db, "users", user.uid);
@@ -66,9 +68,25 @@ export default function Profile({ navigateTo }: ProfileProps) {
     profileImage: ""
   });
 
+  // 🔥 FAST CACHE STEP 1: App khulte hi phone ki memory se data turant load karo
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const cachedProfile = localStorage.getItem('safehelp_profile_cache');
+      if (cachedProfile) {
+        try {
+          setFormData(JSON.parse(cachedProfile));
+          setHasCachedData(true); // Data mil gaya, ab loading screen mat dikhana
+        } catch (e) {
+          console.error("Cache load error", e);
+        }
+      }
+    }
+  }, []);
+
+  // 🔥 FAST CACHE STEP 2: Background mein Firebase se naya data laao aur memory update karo
   useEffect(() => {
     if (profile) {
-      setFormData({
+      const freshData = {
         name: profile.name || "",
         phone: profile.phone || "+91 ",
         fatherName: profile.fatherName || "",
@@ -77,18 +95,31 @@ export default function Profile({ navigateTo }: ProfileProps) {
         disabilityType: profile.disabilityType || "Physical Disability",
         insuranceId: profile.insuranceId || "",
         profileImage: profile.profileImage || ""
-      });
+      };
+      
+      // Agar user edit nahi kar raha hai, tabhi background wala naya data screen par daalo
+      if (!isEditing) {
+        setFormData(freshData);
+      }
+      
+      // Data hamesha ke liye chupchaap memory mein save kar do
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('safehelp_profile_cache', JSON.stringify(freshData));
+      }
+      setHasCachedData(true);
     }
-  }, [profile]);
+  }, [profile, isEditing]);
 
   const handleSave = () => {
     if (!user || !db) return;
-    
     const ref = doc(db, "users", user.uid);
+    setIsEditing(false); // Optimistic UI: Turant edit mode band
     
-    // 🔹 Optimistic UI: Exit edit mode immediately
-    setIsEditing(false);
-    
+    // Save karte waqt naye data ko turant memory (cache) mein daal do
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('safehelp_profile_cache', JSON.stringify(formData));
+    }
+
     setDoc(ref, formData, { merge: true })
       .then(() => {
         toast({ title: "Profile Updated" });
@@ -139,7 +170,8 @@ export default function Profile({ navigateTo }: ProfileProps) {
     }
   };
 
-  if (loading) return (
+  // 🔥 CACHE ENGINE MAGIC: Agar cache mein data hai (!hasCachedData false hoga), toh Loading bypass kar dega
+  if (loading && !hasCachedData) return (
     <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
       <Loader2 className="w-10 h-10 animate-spin text-primary" />
       <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Syncing Profile...</p>

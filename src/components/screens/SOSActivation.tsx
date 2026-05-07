@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -17,10 +16,14 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   const [locationStatus, setLocationStatus] = useState(t.fetchingLocation);
   const [messageStatus, setMessageStatus] = useState(t.preparingAlert);
   const hasSpokenRef = useRef(false);
+  
+  // 🔥 BUG FIX: Timer aur Actions ko Lock karne wala Hathiyar
+  const isActionDoneRef = useRef(false); 
 
   // Text to Speech Helper
   const speak = (text: string) => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel(); // Naya bolne se pehle purana turant roko
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1;
       utterance.pitch = 1;
@@ -43,21 +46,48 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     }
 
     const messageTimer = setTimeout(() => {
-      setMessageStatus(t.sendingSms);
+      if (!isActionDoneRef.current) {
+        setMessageStatus(t.sendingSms);
+      }
     }, 1500);
 
     return () => clearTimeout(messageTimer);
   }, [t]);
 
+  // 🔥 TIMER FIX: Count logic ko 100% safe banaya
   useEffect(() => {
+    if (isActionDoneRef.current) return;
+
     if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      const timer = setTimeout(() => {
+        if (!isActionDoneRef.current) setCountdown(countdown - 1);
+      }, 1000);
       return () => clearTimeout(timer);
     } else {
+      isActionDoneRef.current = true;
       speak("Emergency alerts sent. Tracking is live.");
       onActivated();
     }
   }, [countdown, onActivated]);
+
+  // 🔥 SAFE CANCEL BUTTON
+  const handleCancel = () => {
+    isActionDoneRef.current = true; // Timer ko hamesha ke liye rok dega
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel(); // Awaaz rok dega
+    }
+    onCancel();
+  };
+
+  // 🔥 SAFE SEND BUTTON
+  const handleSendNow = () => {
+    isActionDoneRef.current = true; // Double send hone se rokega
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    speak("Emergency alerts sent. Tracking is live.");
+    onActivated();
+  };
 
   return (
     <div className="flex flex-col min-h-screen p-8 justify-between items-center bg-black text-white relative">
@@ -97,17 +127,14 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       <div className="relative z-10 w-full grid grid-cols-2 gap-4 pb-12">
         <Button 
           variant="ghost" 
-          onClick={() => {
-            window.speechSynthesis.cancel();
-            onCancel();
-          }} 
+          onClick={handleCancel} 
           className="h-24 rounded-[2rem] border-2 border-white/20 text-white text-xl font-bold bg-white/5 hover:bg-white/10 active:scale-95 transition-all flex flex-col items-center justify-center"
         >
           <X className="w-8 h-8 mb-1" />
           <span>{t.cancel}</span>
         </Button>
         <Button 
-          onClick={onActivated} 
+          onClick={handleSendNow} 
           className="h-24 rounded-[2rem] bg-primary text-white text-xl font-bold glow-primary hover:bg-primary/90 active:scale-95 transition-all flex flex-col items-center justify-center"
         >
           <Check className="w-8 h-8 mb-1" />
