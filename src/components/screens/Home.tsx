@@ -53,15 +53,13 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   const { data: profile } = useDoc(userRef);
   const { data: settings } = useDoc(settingsRef);
 
-  // 🚀 FAST ENGINE STEP 1: App khulte hi Memory se Contact aur Settings nikal lo (0 seconds)
+  // 🚀 FAST ENGINE STEP 1: App khulte hi Memory se Contact aur Settings nikal lo
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Load Contact
       const cachedContact = localStorage.getItem('safehelp_fast_contact');
       if (cachedContact) {
         try { setFastContact(JSON.parse(cachedContact)); } catch (e) {}
       }
-      // Load Settings
       const cachedSettings = localStorage.getItem('safehelp_fast_settings');
       if (cachedSettings) {
         try {
@@ -78,7 +76,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     if (profile && profile.contacts && profile.contacts.length > 0) {
       const starred = profile.contacts.find((c: any) => c.isPrimary);
       const contactToSave = starred || profile.contacts[0];
-      setFastContact(contactToSave); // UI update
+      setFastContact(contactToSave); 
       if (typeof window !== 'undefined') {
         localStorage.setItem('safehelp_fast_contact', JSON.stringify(contactToSave));
       }
@@ -124,15 +122,13 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
       const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
       phoneToCall = starred.phone;
     } else {
-      // 🚨 ULTRA FALLBACK: Seedha Milan bhai ko call
       phoneToCall = "+919586875178"; 
     }
 
-    // Number me se space hata kar direct call fire karega
     window.location.href = `tel:${phoneToCall.replace(/\s+/g, '')}`;
   };
 
-  // ⚡ TITANIUM FAST QUICK SMS (Error ka chance 0%)
+  // ⚡ ULTRA-FAST QUICK SMS (BINA LOCATION WAIT KIYE!)
   const handleQuickMessage = () => {
     let phoneToMessage = "";
 
@@ -142,28 +138,14 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
       const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
       phoneToMessage = starred.phone;
     } else {
-      // 🚨 ULTRA FALLBACK: Seedha Milan bhai ko SMS
       phoneToMessage = "+919586875178"; 
     }
 
-    const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. My live location is attached below. Please respond ASAP. 🚨";
+    const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. Please respond ASAP. 🚨";
     
-    const sendSMS = (lat?: number, lng?: number) => {
-      const locationPart = lat && lng ? `\n\n📍 https://maps.google.com/?q=${lat},${lng}` : "";
-      const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}${locationPart}\n\n- Sent via SafeHelp App`;
-      window.location.href = `sms:${phoneToMessage.replace(/\s+/g, '')}?body=${encodeURIComponent(msg)}`;
-    };
-
-    if ("geolocation" in navigator) {
-      toast({ title: "Getting location..." });
-      navigator.geolocation.getCurrentPosition(
-        (pos) => sendSMS(pos.coords.latitude, pos.coords.longitude),
-        () => sendSMS(),
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
-    } else {
-      sendSMS();
-    }
+    // 🔥 YAHAN SE LOCATION KA WAIT HATA DIYA HAI. SEEDHA SMS FIRE HOGA 0 SECOND MEIN!
+    const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}\n\n- Sent via SafeHelp App`;
+    window.location.href = `sms:${phoneToMessage.replace(/\s+/g, '')}?body=${encodeURIComponent(msg)}`;
   };
 
   // 🔹 Advanced Shake Detection System
