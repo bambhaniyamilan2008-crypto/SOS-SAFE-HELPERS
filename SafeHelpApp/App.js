@@ -8,7 +8,9 @@ import {
   Alert,
   Vibration,
   StyleSheet,
-  Text
+  Text,
+  ToastAndroid,
+  Linking // 🔥 Call, SMS, Email sab native apps me bhejega
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
@@ -17,33 +19,25 @@ import { Accelerometer } from 'expo-sensors';
 export default function App() {
   const webViewRef = useRef(null);
   const [canGoBack, setCanGoBack] = useState(false);
-  
-  // 🔥 ANTI-CRASH SHIELD: Website tab tak load nahi hogi jab tak permissions clear na hon
   const [isAppSafeAndReady, setIsAppSafeAndReady] = useState(false);
+  const exitAppTimerRef = useRef(0);
 
   useEffect(() => {
     let shakeSubscription;
 
-    const setupSafeHardware = async () => {
+    // 1️⃣ HARDWARE & SENSOR SETUP
+    const setupApp = async () => {
       try {
-        // 1. Sabse pehle aaram se Location Permission maango (Bina website load kiye)
         let { status } = await Location.requestForegroundPermissionsAsync();
-        
         if (status !== 'granted') {
-          Alert.alert(
-            "Location Required", 
-            "SOS feature chalane ke liye location allow karna zaroori hai.",
-            [{ text: "OK" }]
-          );
+          Alert.alert("Permission Needed", "SOS and Location features require permission.", [{ text: "OK" }]);
         }
 
-        // 2. Shake Sensor ko safely background mein start karo
         Accelerometer.setUpdateInterval(200);
         shakeSubscription = Accelerometer.addListener(data => {
           const force = Math.sqrt(data.x**2 + data.y**2 + data.z**2);
           if (force > 3.8) {
             Vibration.vibrate([200, 100, 200]);
-            // Agar website load ho chuki hai, tabhi SOS trigger karo
             if (webViewRef.current) {
               webViewRef.current.injectJavaScript(`
                 try { if(typeof window.triggerSOS === 'function') window.triggerSOS(); } catch(e) {}
@@ -52,24 +46,31 @@ export default function App() {
             }
           }
         });
-
       } catch (error) {
-        console.warn("Hardware setup issue: ", error);
+        console.warn("Setup Error:", error);
       } finally {
-        // 3. Permissions handle hone ke baad Website ko load hone ki permission do
         setIsAppSafeAndReady(true);
       }
     };
 
-    setupSafeHardware();
+    setupApp();
 
-    // 4. Back Button Logic
+    // 2️⃣ PERFECT BACK BUTTON LOGIC
     const backAction = () => {
       if (canGoBack && webViewRef.current) {
         webViewRef.current.goBack();
         return true; 
+      } else {
+        const timeNow = new Date().getTime();
+        if (timeNow - exitAppTimerRef.current < 2000) {
+          BackHandler.exitApp();
+        } else {
+          exitAppTimerRef.current = timeNow;
+          ToastAndroid.show('Press back again to exit', ToastAndroid.SHORT);
+          return true; 
+        }
       }
-      return false; 
+      return false;
     };
 
     const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
@@ -80,22 +81,17 @@ export default function App() {
     };
   }, [canGoBack]);
 
-  // ==========================================
-  // LOADING SCREEN (Anti-Crash Shield Active)
-  // ==========================================
+  // 3️⃣ SECURE LOADING STATE
   if (!isAppSafeAndReady) {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
         <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={{ color: '#fff', marginTop: 15, fontWeight: 'bold' }}>Securing Connection...</Text>
+        <Text style={{ color: '#fff', marginTop: 15, fontWeight: 'bold' }}>Securing Connections...</Text>
       </View>
     );
   }
 
-  // ==========================================
-  // SAFE WEBVIEW LOAD (WITH GOOGLE LOGIN & ZOOM FIX)
-  // ==========================================
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
@@ -105,21 +101,45 @@ export default function App() {
         source={{ uri: 'https://sos-safe-helpers.vercel.app/' }} 
         style={styles.webview}
         
-        originWhitelist={['*']}
+        // 🔥 ORIGIN WHITELIST: Har tarah ke link ko allow kiya
+        originWhitelist={['*', 'http://*', 'https://*', 'tel:*', 'sms:*', 'mailto:*', 'whatsapp:*', 'geo:*']}
+        
+        // 4️⃣ UNIVERSAL LINK HANDLER (CALL, SMS, MAPS, WHATSAPP)
+        onShouldStartLoadWithRequest={(request) => {
+          const url = request.url;
+          
+          if (url.startsWith('tel:') || 
+              url.startsWith('sms:') || 
+              url.startsWith('mailto:') || 
+              url.startsWith('whatsapp:') || 
+              url.startsWith('geo:') || 
+              url.startsWith('intent:')) {
+            
+            // Check karega ki phone mein SMS/Dialer app hai ya nahi, aur open karega
+            Linking.canOpenURL(url).then(supported => {
+              if (supported) {
+                Linking.openURL(url);
+              } else {
+                console.log("No app installed to handle this URL:", url);
+              }
+            }).catch(err => console.log('Linking Error:', err));
+            
+            return false; // WebView ko white screen par jaane se rokega
+          }
+          return true; // Baaki poori website perfectly chalegi
+        }}
+
+        // 5️⃣ CORE WEBVIEW SETTINGS
         javaScriptEnabled={true}
         domStorageEnabled={true}
         geolocationEnabled={true} 
         allowsInlineMediaPlayback={true} 
-        
-        // 🔥 FIX 1: GOOGLE LOGIN HACK 🔥
-        // Google ko lagega ki asli Chrome browser chal raha hai, app nahi
         userAgent="Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36"
         thirdPartyCookiesEnabled={true}
         sharedCookiesEnabled={true}
-        setSupportMultipleWindows={false} // Google ko bahar naya Chrome tab kholne se rokega
+        setSupportMultipleWindows={false} 
         
-        // 🔥 FIX 2: ZOOM LOCK (Anti-Zoom Script) 🔥
-        // Website khulte hi uski zoom karne ki taqat khatam kar dega
+        // 6️⃣ ZOOM LOCK INJECTION
         injectedJavaScript={`
           const meta = document.createElement('meta'); 
           meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0'); 
@@ -128,6 +148,7 @@ export default function App() {
           true;
         `}
         
+        // Track history for Back Button
         onNavigationStateChange={(navState) => {
           setCanGoBack(navState.canGoBack);
         }}

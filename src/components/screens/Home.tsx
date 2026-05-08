@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
@@ -34,7 +33,11 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
+  
+  // 🔥 FAST CACHE STATES (Zero Loading Delay)
   const [shakeEnabled, setShakeEnabled] = useState(false);
+  const [shakeSensitivity, setShakeSensitivity] = useState("high");
+  const [fastContact, setFastContact] = useState<any>(null);
   const [shakeStatus, setShakeStatus] = useState<"idle" | "detected" | "triggered">("idle");
 
   const userRef = useMemo(() => {
@@ -50,22 +53,57 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   const { data: profile } = useDoc(userRef);
   const { data: settings } = useDoc(settingsRef);
 
-  // Sync Shake setting with Firestore
+  // 🚀 FAST ENGINE STEP 1: App khulte hi Memory se Contact aur Settings nikal lo (0 seconds)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Load Contact
+      const cachedContact = localStorage.getItem('safehelp_fast_contact');
+      if (cachedContact) {
+        try { setFastContact(JSON.parse(cachedContact)); } catch (e) {}
+      }
+      // Load Settings
+      const cachedSettings = localStorage.getItem('safehelp_fast_settings');
+      if (cachedSettings) {
+        try {
+          const parsed = JSON.parse(cachedSettings);
+          setShakeEnabled(parsed.shakeSos || false);
+          setShakeSensitivity(parsed.shakeSensitivity || "high");
+        } catch (e) {}
+      }
+    }
+  }, []);
+
+  // 🚀 FAST ENGINE STEP 2: Firebase se data aane par Memory ko chupchaap update kar do
+  useEffect(() => {
+    if (profile && profile.contacts && profile.contacts.length > 0) {
+      const starred = profile.contacts.find((c: any) => c.isPrimary);
+      const contactToSave = starred || profile.contacts[0];
+      setFastContact(contactToSave); // UI update
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('safehelp_fast_contact', JSON.stringify(contactToSave));
+      }
+    }
+  }, [profile]);
+
   useEffect(() => {
     if (settings) {
       setShakeEnabled(settings.shakeSos || false);
+      setShakeSensitivity(settings.shakeSensitivity || "high");
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('safehelp_fast_settings', JSON.stringify(settings));
+      }
     }
   }, [settings]);
 
-  const primaryContact = useMemo(() => {
-    if (!profile?.contacts || profile.contacts.length === 0) return null;
-    const starred = profile.contacts.find((c: any) => c.isPrimary);
-    if (starred) return starred;
-    return profile.contacts[0];
-  }, [profile]);
-
+  // ⚡ SHAKE TOGGLE LOGIC
   const toggleShake = async (val: boolean) => {
     setShakeEnabled(val);
+    if (typeof window !== 'undefined') {
+      const currentCache = JSON.parse(localStorage.getItem('safehelp_fast_settings') || '{}');
+      currentCache.shakeSos = val;
+      localStorage.setItem('safehelp_fast_settings', JSON.stringify(currentCache));
+    }
+    
     if (user && db) {
       const sRef = doc(db, "users", user.uid, "settings", "default");
       await setDoc(sRef, { shakeSos: val }, { merge: true });
@@ -76,9 +114,10 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     });
   };
 
+  // ⚡ BULLET-FAST QUICK CALL
   const handleQuickCall = () => {
-    if (primaryContact && primaryContact.phone) {
-      window.location.href = `tel:${primaryContact.phone}`;
+    if (fastContact && fastContact.phone) {
+      window.location.href = `tel:${fastContact.phone}`;
     } else {
       toast({
         variant: "destructive",
@@ -89,8 +128,9 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     }
   };
 
+  // ⚡ BULLET-FAST QUICK SMS
   const handleQuickMessage = () => {
-    if (!primaryContact || !primaryContact.phone) {
+    if (!fastContact || !fastContact.phone) {
       toast({
         variant: "destructive",
         title: "No Contact Found",
@@ -105,7 +145,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     const sendSMS = (lat?: number, lng?: number) => {
       const locationPart = lat && lng ? `\n\n📍 https://maps.google.com/?q=${lat},${lng}` : "";
       const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}${locationPart}\n\n- Sent via SafeHelp App`;
-      window.location.href = `sms:${primaryContact.phone}?body=${encodeURIComponent(msg)}`;
+      window.location.href = `sms:${fastContact.phone}?body=${encodeURIComponent(msg)}`;
     };
 
     if ("geolocation" in navigator) {
@@ -127,43 +167,36 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   useEffect(() => {
     if (!shakeEnabled || isSOSActive) return;
 
-    // Threshold mapping based on sensitivity settings
     const SENSITIVITY_THRESHOLDS: Record<string, number> = {
       low: 15,
       medium: 25,
       high: 35
     };
     
-    const threshold = SENSITIVITY_THRESHOLDS[settings?.shakeSensitivity || "high"] || 35;
-    const SHAKE_WINDOW_MS = 500; // Continuous shake required for 0.5s
-    const COOLDOWN_MS = 3000;    // Ignore shakes for 3s after trigger
+    const threshold = SENSITIVITY_THRESHOLDS[shakeSensitivity] || 35;
+    const SHAKE_WINDOW_MS = 500; 
+    const COOLDOWN_MS = 3000;    
 
     const handleMotion = (event: DeviceMotionEvent) => {
       const acceleration = event.accelerationIncludingGravity;
       if (!acceleration) return;
 
       const now = Date.now();
-      
-      // 1. Check cooldown
       if (now < cooldownRef.current) return;
 
-      // 2. Calculate Total Force: |x| + |y| + |z|
       const x = Math.abs(acceleration.x || 0);
       const y = Math.abs(acceleration.y || 0);
       const z = Math.abs(acceleration.z || 0);
       const totalForce = x + y + z;
 
-      // 3. Shake Detection Logic
       if (totalForce > threshold) {
-        // First detected shake in a potential sequence
         if (shakeStartTimeRef.current === 0) {
           shakeStartTimeRef.current = now;
           setShakeStatus("detected");
         }
 
-        // Check if shake has been continuous for 500ms
         if (now - shakeStartTimeRef.current >= SHAKE_WINDOW_MS) {
-          cooldownRef.current = now + COOLDOWN_MS; // Start cooldown
+          cooldownRef.current = now + COOLDOWN_MS; 
           shakeStartTimeRef.current = 0;
           setShakeStatus("triggered");
           
@@ -180,7 +213,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
           navigateTo("sos-activation");
         }
       } else {
-        // Reset if shake intensity drops below threshold
         shakeStartTimeRef.current = 0;
         setShakeStatus("idle");
       }
@@ -191,7 +223,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
       window.removeEventListener('devicemotion', handleMotion);
       shakeStartTimeRef.current = 0;
     };
-  }, [shakeEnabled, settings?.shakeSensitivity, isSOSActive, navigateTo, t, toast]);
+  }, [shakeEnabled, shakeSensitivity, isSOSActive, navigateTo, t, toast]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background relative overflow-y-auto">
@@ -339,7 +371,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
                 {t.shakeSos}
               </span>
               <span className={cn("text-[10px] font-bold uppercase opacity-80", shakeEnabled ? "text-white/90" : "text-muted-foreground/80")}>
-                {shakeEnabled ? `${t.activeDetection} (${t[settings?.shakeSensitivity || 'high']})` : t.sensorDisabled}
+                {shakeEnabled ? `${t.activeDetection} (${t[shakeSensitivity] || 'high'})` : t.sensorDisabled}
               </span>
             </div>
           </button>
