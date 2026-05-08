@@ -112,49 +112,50 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     });
   };
 
-  // ⚡ TITANIUM FAST QUICK CALL (Invisible Link Bypass)
+  // ⚡ THE ULTIMATE BRIDGE FIX FOR CALL
   const handleQuickCall = () => {
-    let phoneToCall = "";
+    let phoneToCall = "+919586875178"; // Default Fallback
 
     if (fastContact && fastContact.phone) {
       phoneToCall = fastContact.phone;
     } else if (profile && profile.contacts && profile.contacts.length > 0) {
       const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
       phoneToCall = starred.phone;
-    } else {
-      phoneToCall = "+919586875178"; 
-    }
+    } 
 
-    // 🔥 THE MAGIC FIX: Android WebView Bypass
-    const link = document.createElement('a');
-    link.href = `tel:${phoneToCall.replace(/\s+/g, '')}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const finalNumber = phoneToCall.replace(/\s+/g, '');
+
+    // WebView App ko direct message bhejo
+    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "CALL", number: finalNumber }));
+    } else {
+      // Agar PC ya normal browser par khola ho
+      window.location.href = `tel:${finalNumber}`; 
+    }
   };
 
-  // ⚡ ULTRA-FAST QUICK SMS (Invisible Link Bypass)
+  // ⚡ THE ULTIMATE BRIDGE FIX FOR SMS
   const handleQuickMessage = () => {
-    let phoneToMessage = "";
+    let phoneToMessage = "+919586875178"; // Default Fallback
 
     if (fastContact && fastContact.phone) {
       phoneToMessage = fastContact.phone;
     } else if (profile && profile.contacts && profile.contacts.length > 0) {
       const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
       phoneToMessage = starred.phone;
-    } else {
-      phoneToMessage = "+919586875178"; 
-    }
+    } 
 
+    const finalNumber = phoneToMessage.replace(/\s+/g, '');
     const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. Please respond ASAP. 🚨";
     const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}\n\n- Sent via SafeHelp App`;
     
-    // 🔥 THE MAGIC FIX FOR SMS
-    const link = document.createElement('a');
-    link.href = `sms:${phoneToMessage.replace(/\s+/g, '')}?body=${encodeURIComponent(msg)}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // WebView App ko direct message bhejo
+    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "SMS", number: finalNumber, text: msg }));
+    } else {
+      // Agar PC ya normal browser par khola ho
+      window.location.href = `sms:${finalNumber}?body=${encodeURIComponent(msg)}`;
+    }
   };
 
   // 🔹 Advanced Shake Detection System

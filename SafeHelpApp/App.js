@@ -25,7 +25,6 @@ export default function App() {
   useEffect(() => {
     let shakeSubscription;
 
-    // 1️⃣ HARDWARE & SENSOR SETUP
     const setupApp = async () => {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
@@ -55,7 +54,6 @@ export default function App() {
 
     setupApp();
 
-    // 2️⃣ PERFECT BACK BUTTON LOGIC
     const backAction = () => {
       if (canGoBack && webViewRef.current) {
         webViewRef.current.goBack();
@@ -81,7 +79,6 @@ export default function App() {
     };
   }, [canGoBack]);
 
-  // 3️⃣ SECURE LOADING STATE
   if (!isAppSafeAndReady) {
     return (
       <View style={styles.loadingContainer}>
@@ -101,38 +98,37 @@ export default function App() {
         source={{ uri: 'https://sos-safe-helpers.vercel.app/' }} 
         style={styles.webview}
         
-        originWhitelist={['*', 'http://*', 'https://*', 'tel:*', 'sms:*', 'mailto:*', 'whatsapp:*', 'geo:*']}
+        originWhitelist={['*', 'http://*', 'https://*', 'tel:*', 'sms:*']}
         
-        // 4️⃣ UNIVERSAL LINK HANDLER (FORCE OPEN FIX)
-        onShouldStartLoadWithRequest={(request) => {
-          const url = request.url;
-          
-          if (url.startsWith('tel:') || 
-              url.startsWith('sms:') || 
-              url.startsWith('mailto:') || 
-              url.startsWith('whatsapp:') || 
-              url.startsWith('geo:') || 
-              url.startsWith('intent:')) {
-            
-            // 🔥 FIX: Android 11+ blocks permission checks, so we use FORCE OPEN!
-            Linking.openURL(url).catch(err => console.log('Linking Error:', err));
-            
-            return false; // WebView ko white screen par jaane se rokega
+        // 🔥 THE ULTIMATE BRIDGE RECEIVER: Website se bheja gaya gupt message yahan aayega aur seedha call lagayega
+        onMessage={(event) => {
+          try {
+            const data = JSON.parse(event.nativeEvent.data);
+            if (data.action === 'CALL') {
+              Linking.openURL(`tel:${data.number}`);
+            } else if (data.action === 'SMS') {
+              Linking.openURL(`sms:${data.number}?body=${encodeURIComponent(data.text)}`);
+            }
+          } catch (error) {
+            console.log("Bridge Error: ", error);
           }
-          return true; // Baaki poori website perfectly chalegi
         }}
 
-        // 5️⃣ CORE WEBVIEW SETTINGS
+        onShouldStartLoadWithRequest={(request) => {
+          const url = request.url;
+          if (url.startsWith('tel:') || url.startsWith('sms:')) {
+            Linking.openURL(url).catch(err => console.log('Linking Error:', err));
+            return false;
+          }
+          return true; 
+        }}
+
         javaScriptEnabled={true}
         domStorageEnabled={true}
         geolocationEnabled={true} 
         allowsInlineMediaPlayback={true} 
         userAgent="Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36"
-        thirdPartyCookiesEnabled={true}
-        sharedCookiesEnabled={true}
-        setSupportMultipleWindows={false} 
         
-        // 6️⃣ ZOOM LOCK INJECTION
         injectedJavaScript={`
           const meta = document.createElement('meta'); 
           meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0'); 
@@ -159,10 +155,5 @@ export default function App() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0B0F19' },
   webview: { flex: 1 },
-  loadingContainer: { 
-    flex: 1, 
-    backgroundColor: '#0B0F19', 
-    justifyContent: 'center', 
-    alignItems: 'center'
-  }
+  loadingContainer: { flex: 1, backgroundColor: '#0B0F19', justifyContent: 'center', alignItems: 'center' }
 });
