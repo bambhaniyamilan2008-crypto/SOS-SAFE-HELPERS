@@ -114,30 +114,36 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     });
   };
 
-  // ⚡ BULLET-FAST QUICK CALL
+  // ⚡ TITANIUM FAST QUICK CALL (Error ka chance 0%)
   const handleQuickCall = () => {
+    let phoneToCall = "";
+
     if (fastContact && fastContact.phone) {
-      window.location.href = `tel:${fastContact.phone}`;
+      phoneToCall = fastContact.phone;
+    } else if (profile && profile.contacts && profile.contacts.length > 0) {
+      const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
+      phoneToCall = starred.phone;
     } else {
-      toast({
-        variant: "destructive",
-        title: "No Contact Found",
-        description: "Please add an emergency contact first.",
-      });
-      navigateTo("contacts");
+      // 🚨 ULTRA FALLBACK: Seedha Milan bhai ko call
+      phoneToCall = "+919586875178"; 
     }
+
+    // Number me se space hata kar direct call fire karega
+    window.location.href = `tel:${phoneToCall.replace(/\s+/g, '')}`;
   };
 
-  // ⚡ BULLET-FAST QUICK SMS
+  // ⚡ TITANIUM FAST QUICK SMS (Error ka chance 0%)
   const handleQuickMessage = () => {
-    if (!fastContact || !fastContact.phone) {
-      toast({
-        variant: "destructive",
-        title: "No Contact Found",
-        description: "Please add an emergency contact first.",
-      });
-      navigateTo("contacts");
-      return;
+    let phoneToMessage = "";
+
+    if (fastContact && fastContact.phone) {
+      phoneToMessage = fastContact.phone;
+    } else if (profile && profile.contacts && profile.contacts.length > 0) {
+      const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
+      phoneToMessage = starred.phone;
+    } else {
+      // 🚨 ULTRA FALLBACK: Seedha Milan bhai ko SMS
+      phoneToMessage = "+919586875178"; 
     }
 
     const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. My live location is attached below. Please respond ASAP. 🚨";
@@ -145,7 +151,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     const sendSMS = (lat?: number, lng?: number) => {
       const locationPart = lat && lng ? `\n\n📍 https://maps.google.com/?q=${lat},${lng}` : "";
       const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}${locationPart}\n\n- Sent via SafeHelp App`;
-      window.location.href = `sms:${fastContact.phone}?body=${encodeURIComponent(msg)}`;
+      window.location.href = `sms:${phoneToMessage.replace(/\s+/g, '')}?body=${encodeURIComponent(msg)}`;
     };
 
     if ("geolocation" in navigator) {
