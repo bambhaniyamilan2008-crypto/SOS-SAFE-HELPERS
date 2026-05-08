@@ -112,7 +112,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     });
   };
 
-  // ⚡ TITANIUM FAST QUICK CALL (Error ka chance 0%)
+  // ⚡ TITANIUM FAST QUICK CALL (Invisible Link Bypass)
   const handleQuickCall = () => {
     let phoneToCall = "";
 
@@ -125,10 +125,15 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
       phoneToCall = "+919586875178"; 
     }
 
-    window.location.href = `tel:${phoneToCall.replace(/\s+/g, '')}`;
+    // 🔥 THE MAGIC FIX: Android WebView Bypass
+    const link = document.createElement('a');
+    link.href = `tel:${phoneToCall.replace(/\s+/g, '')}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  // ⚡ ULTRA-FAST QUICK SMS (BINA LOCATION WAIT KIYE!)
+  // ⚡ ULTRA-FAST QUICK SMS (Invisible Link Bypass)
   const handleQuickMessage = () => {
     let phoneToMessage = "";
 
@@ -142,10 +147,14 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     }
 
     const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. Please respond ASAP. 🚨";
-    
-    // 🔥 YAHAN SE LOCATION KA WAIT HATA DIYA HAI. SEEDHA SMS FIRE HOGA 0 SECOND MEIN!
     const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}\n\n- Sent via SafeHelp App`;
-    window.location.href = `sms:${phoneToMessage.replace(/\s+/g, '')}?body=${encodeURIComponent(msg)}`;
+    
+    // 🔥 THE MAGIC FIX FOR SMS
+    const link = document.createElement('a');
+    link.href = `sms:${phoneToMessage.replace(/\s+/g, '')}?body=${encodeURIComponent(msg)}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // 🔹 Advanced Shake Detection System

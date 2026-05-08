@@ -10,7 +10,7 @@ import {
   StyleSheet,
   Text,
   ToastAndroid,
-  Linking // 🔥 Call, SMS, Email sab native apps me bhejega
+  Linking 
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
@@ -101,10 +101,9 @@ export default function App() {
         source={{ uri: 'https://sos-safe-helpers.vercel.app/' }} 
         style={styles.webview}
         
-        // 🔥 ORIGIN WHITELIST: Har tarah ke link ko allow kiya
         originWhitelist={['*', 'http://*', 'https://*', 'tel:*', 'sms:*', 'mailto:*', 'whatsapp:*', 'geo:*']}
         
-        // 4️⃣ UNIVERSAL LINK HANDLER (CALL, SMS, MAPS, WHATSAPP)
+        // 4️⃣ UNIVERSAL LINK HANDLER (FORCE OPEN FIX)
         onShouldStartLoadWithRequest={(request) => {
           const url = request.url;
           
@@ -115,14 +114,8 @@ export default function App() {
               url.startsWith('geo:') || 
               url.startsWith('intent:')) {
             
-            // Check karega ki phone mein SMS/Dialer app hai ya nahi, aur open karega
-            Linking.canOpenURL(url).then(supported => {
-              if (supported) {
-                Linking.openURL(url);
-              } else {
-                console.log("No app installed to handle this URL:", url);
-              }
-            }).catch(err => console.log('Linking Error:', err));
+            // 🔥 FIX: Android 11+ blocks permission checks, so we use FORCE OPEN!
+            Linking.openURL(url).catch(err => console.log('Linking Error:', err));
             
             return false; // WebView ko white screen par jaane se rokega
           }
@@ -148,7 +141,6 @@ export default function App() {
           true;
         `}
         
-        // Track history for Back Button
         onNavigationStateChange={(navState) => {
           setCanGoBack(navState.canGoBack);
         }}
