@@ -98,9 +98,9 @@ export default function App() {
         source={{ uri: 'https://sos-safe-helpers.vercel.app/' }} 
         style={styles.webview}
         
-        originWhitelist={['*', 'http://*', 'https://*', 'tel:*', 'sms:*']}
+        originWhitelist={['*']}
         
-        // 🔥 THE ULTIMATE BRIDGE RECEIVER: Website se bheja gaya gupt message yahan aayega aur seedha call lagayega
+        // 🔥 ULTIMATE BYPASS 1: Direct Bridge from Website
         onMessage={(event) => {
           try {
             const data = JSON.parse(event.nativeEvent.data);
@@ -114,13 +114,14 @@ export default function App() {
           }
         }}
 
+        // 🔥 ULTIMATE BYPASS 2: Link Interceptor (Agar HTML tag click hua toh)
         onShouldStartLoadWithRequest={(request) => {
           const url = request.url;
-          if (url.startsWith('tel:') || url.startsWith('sms:')) {
+          if (url.startsWith('tel:') || url.startsWith('sms:') || url.startsWith('mailto:') || url.startsWith('whatsapp:')) {
             Linking.openURL(url).catch(err => console.log('Linking Error:', err));
-            return false;
+            return false; // WebView ko URL kholne se rokta hai aur phone ko de deta hai
           }
-          return true; 
+          return true; // Baaki website normal chalegi
         }}
 
         javaScriptEnabled={true}
@@ -139,6 +140,14 @@ export default function App() {
         
         onNavigationStateChange={(navState) => {
           setCanGoBack(navState.canGoBack);
+          
+          // 🔥 ULTIMATE BYPASS 3: Fallback Navigation Catcher
+          if (navState.url.startsWith('tel:') || navState.url.startsWith('sms:')) {
+            if (webViewRef.current) {
+              webViewRef.current.stopLoading(); // WebView ko rok do
+            }
+            Linking.openURL(navState.url).catch(e => console.log(e));
+          }
         }}
         
         startInLoadingState={true}

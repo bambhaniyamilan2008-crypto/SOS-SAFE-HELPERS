@@ -141,7 +141,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     }, 200);
   };
 
-  // 🔥 THE "GOD MODE" SMS FIRE (3 Tareeko se ek sath attack karega)
+ // 🔥 THE "GOD MODE" SMS FIRE (WITH SUPER-FAST LOCATION LINK)
   const handleQuickMessage = () => {
     let phoneToMessage = "+919586875178"; 
     if (fastContact && fastContact.phone) phoneToMessage = fastContact.phone;
@@ -152,29 +152,51 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
 
     const cleanPhone = phoneToMessage.replace(/\s+/g, '');
     const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. Please respond ASAP. 🚨";
-    const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}\n\n- Sent via SafeHelp App`;
-    const encodedMsg = encodeURIComponent(msg);
 
-    // ATTACK 1: App Bridge
-    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
-      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "SMS", number: cleanPhone, text: msg }));
+    // SMS Bhejne ka Engine
+    const fireSMS = (locationLink: string) => {
+      const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}${locationLink}\n\n- Sent via SafeHelp App`;
+      const encodedMsg = encodeURIComponent(msg);
+
+      // ATTACK 1: App Bridge
+      if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+        (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "SMS", number: cleanPhone, text: msg }));
+      }
+
+      // ATTACK 2: Top Level Force Override
+      setTimeout(() => {
+        if (window.top) window.top.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
+        else window.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
+      }, 100);
+
+      // ATTACK 3: Invisible Link Click
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.href = `sms:${cleanPhone}?body=${encodedMsg}`;
+        link.target = '_top';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, 200);
+    };
+
+    // Location Nikalne ka Fast Code (Sirf 3 second ka timeout)
+    if ("geolocation" in navigator) {
+      toast({ title: "Getting location..." });
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const locLink = `\n\n📍 Live Location: https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
+          fireSMS(locLink);
+        },
+        (err) => {
+          console.log("Location Error: ", err);
+          fireSMS("\n\n📍 Location: GPS was slow/off. Track from app."); // Fail hone par bhi SMS rukega nahi
+        },
+        { enableHighAccuracy: true, timeout: 3000, maximumAge: 10000 } // 3 Second me timeout!
+      );
+    } else {
+      fireSMS("");
     }
-
-    // ATTACK 2: Top Level Force Override
-    setTimeout(() => {
-      if (window.top) window.top.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
-      else window.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
-    }, 100);
-
-    // ATTACK 3: Invisible Link Click
-    setTimeout(() => {
-      const link = document.createElement('a');
-      link.href = `sms:${cleanPhone}?body=${encodedMsg}`;
-      link.target = '_top';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }, 200);
   };
 
   const shakeStartTimeRef = useRef<number>(0);
