@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useDoc } from "@/firebase";
 
-// 🔥 FIREBASE IMPORTS ADD KIYE HAIN
+// 🔥 FIREBASE IMPORTS
 import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore";
 
 const DEFAULT_COORDS: [number, number] = [21.7645, 72.1519];
@@ -106,9 +106,9 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     if ("geolocation" in navigator) {
       // 🚀 EXTREME HIGH ACCURACY SETTINGS
       const geoOptions = { 
-        enableHighAccuracy: true, // Force GPS Hardware
+        enableHighAccuracy: true, 
         timeout: 5000, 
-        maximumAge: 0 // Koi purani cache use nahi hogi
+        maximumAge: 0 
       };
 
       const updateLocation = (position: GeolocationPosition) => {
@@ -219,17 +219,23 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     }, 100);
   };
 
- // 🔥 THE GHOST-PROOF RESOLVE FUNCTION!
+  // 🔥 THE PREMIUM GHOST-PROOF RESOLVE FUNCTION!
   const handleSafeClick = async () => {
     try {
       console.log("🚨 LIVE MAP SCREEN: I AM SAFE Button Pressed!");
+
+      // Update shuru hote hi ek chota loading message
+      toast({
+        title: "🔄 Updating Status...",
+        description: "Securing your dashboard...",
+      });
 
       let targetId = null;
       if (typeof window !== "undefined") {
         targetId = localStorage.getItem("activeAlertId");
       }
 
-      let isUpdated = false; // Flag check karne ke liye
+      let isUpdated = false;
 
       // Plan A: Pehle Memory (Local Storage) wali ID ko update karne ki koshish karo
       if (targetId && db) {
@@ -238,7 +244,7 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
             status: "resolved",
             resolvedAt: serverTimestamp()
           });
-          isUpdated = true; // Success ho gaya!
+          isUpdated = true;
           console.log("✅ Plan A Success: Direct ID updated.");
         } catch (innerError) {
           console.log("⚠️ Plan A Failed (Purani/Ghost ID). Shifting to Plan B...");
@@ -264,23 +270,32 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
         }
       }
 
-      // Memory se kachra (purani ID) saaf kar do taaki aage problem na ho
+      // Memory se kachra saaf kar do
       if (typeof window !== "undefined") {
         localStorage.removeItem("activeAlertId");
       }
 
-      // 🔥 POPUP TO BLOCK (Server ko time milega)
-      alert("✅ ALERT RESOLVED! Dashboard ab 100% Green hoga.");
+      // 🔥 UGLY ALERT HATA DIYA! AB BEAUTIFUL TOAST AAYEGA
+      toast({
+        title: "✅ STATUS: SECURED!",
+        description: "Emergency alert deactivated. You are safe now.",
+        className: "bg-green-600 text-white border-none shadow-2xl", 
+        duration: 3000,
+      });
 
     } catch (error: any) {
       console.error("🔥 UPDATE ERROR:", error);
-      alert("Error: " + error.message);
+      toast({
+        title: "❌ Error",
+        description: error.message,
+        variant: "destructive",
+      });
     }
 
-    // 🔥 2 second ruko phir screen band karo
+    // 🔥 Toast ko padhne ke liye dhai (2.5) second ka time diya hai, phir screen band hogi
     setTimeout(() => {
       onResolve(); 
-    }, 2000); 
+    }, 2500); 
   };
 
   const customMarkerIcon = useMemo(() => {
@@ -373,7 +388,7 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
                 <span className="text-[10px] uppercase font-bold">{t.message}</span>
               </Button>
             </div>
-            {/* 🔥 YAHAN MAINEY onResolve KO HATA KAR APNA NAYA FUNCTION LAGA DIYA HAI */}
+            
             <Button onClick={handleSafeClick} className="w-full h-20 rounded-[2rem] bg-green-500 text-white font-bold text-xl glow-primary active:scale-95 transition-all">
               {t.imSafe}
             </Button>
