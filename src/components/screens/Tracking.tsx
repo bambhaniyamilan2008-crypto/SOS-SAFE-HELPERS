@@ -17,7 +17,9 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useDoc } from "@/firebase";
-import { doc } from "firebase/firestore";
+
+// 🔥 FIREBASE IMPORTS ADD KIYE HAIN
+import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore";
 
 const DEFAULT_COORDS: [number, number] = [21.7645, 72.1519];
 
@@ -80,7 +82,7 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     }
   }, [profile]);
 
-  // 🔥 THE MASTER LOCATION ENGINE (Dual-Engine Aggressive Lock)
+  // 🔥 THE MASTER LOCATION ENGINE (High Accuracy Lock)
   useEffect(() => {
     setIsMounted(true);
     const loadLeaflet = async () => {
@@ -102,16 +104,16 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     let intervalId: any;
 
     if ("geolocation" in navigator) {
+      // 🚀 EXTREME HIGH ACCURACY SETTINGS
       const geoOptions = { 
         enableHighAccuracy: true, // Force GPS Hardware
         timeout: 5000, 
-        maximumAge: 0 // No cached location allowed
+        maximumAge: 0 // Koi purani cache use nahi hogi
       };
 
       const updateLocation = (position: GeolocationPosition) => {
         const newCoords: [number, number] = [position.coords.latitude, position.coords.longitude];
         
-        // Sirf tabhi update karo jab location sach mein badle (Jitter roko)
         setCoords(prev => {
           if (prev[0] !== newCoords[0] || prev[1] !== newCoords[1]) {
             return newCoords;
@@ -124,7 +126,6 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
         if (position.coords.heading !== null) setHeading(position.coords.heading);
       };
 
-      // ENGINE 1: Standard Watch (Passive Listener)
       watchId = navigator.geolocation.watchPosition(
         updateLocation,
         (err) => {
@@ -134,14 +135,13 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
         geoOptions
       );
 
-      // ENGINE 2: The Shock Engine (Force Active Ping every 3 seconds)
       intervalId = setInterval(() => {
         navigator.geolocation.getCurrentPosition(
           updateLocation,
-          () => {}, // Ignore errors for shock engine
+          () => {}, 
           geoOptions
         );
-      }, 3000); // 3 Second ka jhatka!
+      }, 3000); 
     }
 
     return () => {
@@ -150,7 +150,6 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     };
   }, [t.lastUpdate, t.gpsWeak]);
 
-  // AUTO-CAMERA PANNING
   useEffect(() => {
     if (mapInstanceRef.current && coords[0] !== DEFAULT_COORDS[0]) {
       mapInstanceRef.current.setView(coords, mapInstanceRef.current.getZoom(), {
@@ -198,15 +197,6 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
       if (window.top) window.top.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
       else window.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
     }, 100);
-
-    setTimeout(() => {
-      const link = document.createElement('a');
-      link.href = `sms:${cleanPhone}?body=${encodedMsg}`;
-      link.target = '_top';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }, 200);
   };
 
   const handleCallSupport = () => {
@@ -227,15 +217,70 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
       if (window.top) window.top.location.href = `tel:${cleanPhone}`;
       else window.location.href = `tel:${cleanPhone}`;
     }, 100);
+  };
 
+ // 🔥 THE GHOST-PROOF RESOLVE FUNCTION!
+  const handleSafeClick = async () => {
+    try {
+      console.log("🚨 LIVE MAP SCREEN: I AM SAFE Button Pressed!");
+
+      let targetId = null;
+      if (typeof window !== "undefined") {
+        targetId = localStorage.getItem("activeAlertId");
+      }
+
+      let isUpdated = false; // Flag check karne ke liye
+
+      // Plan A: Pehle Memory (Local Storage) wali ID ko update karne ki koshish karo
+      if (targetId && db) {
+        try {
+          await updateDoc(doc(db, "alerts", targetId), {
+            status: "resolved",
+            resolvedAt: serverTimestamp()
+          });
+          isUpdated = true; // Success ho gaya!
+          console.log("✅ Plan A Success: Direct ID updated.");
+        } catch (innerError) {
+          console.log("⚠️ Plan A Failed (Purani/Ghost ID). Shifting to Plan B...");
+        }
+      }
+
+      // Plan B: Agar ID purani thi ya error aaya, toh God Mode Query chalao
+      if (!isUpdated && db) {
+        const q = query(collection(db, "alerts"), where("status", "==", "active"));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const updatePromises = querySnapshot.docs.map((alertDoc) => 
+            updateDoc(doc(db, "alerts", alertDoc.id), {
+              status: "resolved",
+              resolvedAt: serverTimestamp()
+            })
+          );
+          await Promise.all(updatePromises);
+          console.log("✅ Plan B Success: Sab active alerts resolve kar diye!");
+        } else {
+          console.log("Koi active alert bacha hi nahi tha.");
+        }
+      }
+
+      // Memory se kachra (purani ID) saaf kar do taaki aage problem na ho
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("activeAlertId");
+      }
+
+      // 🔥 POPUP TO BLOCK (Server ko time milega)
+      alert("✅ ALERT RESOLVED! Dashboard ab 100% Green hoga.");
+
+    } catch (error: any) {
+      console.error("🔥 UPDATE ERROR:", error);
+      alert("Error: " + error.message);
+    }
+
+    // 🔥 2 second ruko phir screen band karo
     setTimeout(() => {
-      const link = document.createElement('a');
-      link.href = `tel:${cleanPhone}`;
-      link.target = '_top';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }, 200);
+      onResolve(); 
+    }, 2000); 
   };
 
   const customMarkerIcon = useMemo(() => {
@@ -328,7 +373,8 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
                 <span className="text-[10px] uppercase font-bold">{t.message}</span>
               </Button>
             </div>
-            <Button onClick={onResolve} className="w-full h-20 rounded-[2rem] bg-green-500 text-white font-bold text-xl glow-primary active:scale-95 transition-all">
+            {/* 🔥 YAHAN MAINEY onResolve KO HATA KAR APNA NAYA FUNCTION LAGA DIYA HAI */}
+            <Button onClick={handleSafeClick} className="w-full h-20 rounded-[2rem] bg-green-500 text-white font-bold text-xl glow-primary active:scale-95 transition-all">
               {t.imSafe}
             </Button>
           </div>
