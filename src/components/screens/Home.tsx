@@ -177,8 +177,9 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
       }, 200);
     };
 
+    // 🔥 HIGH-PRECISION LOCATION LOCK UPDATE
     if ("geolocation" in navigator) {
-      toast({ title: "Getting location..." });
+      toast({ title: "Locking precise GPS location..." });
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const locLink = `\n\n📍 Live Location: https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;
@@ -188,7 +189,9 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
           console.log("Location Error: ", err);
           fireSMS("\n\n📍 Location: GPS was slow/off. Track from app."); 
         },
-        { enableHighAccuracy: true, timeout: 3000, maximumAge: 10000 } 
+        // maximumAge: 0 = Pure Fresh Satellite Data
+        // timeout: 10000 = 10 second waiting time for perfect lock
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } 
       );
     } else {
       fireSMS("");
@@ -250,7 +253,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   }, [shakeEnabled, shakeSensitivity, isSOSActive, navigateTo, t, toast]);
 
   return (
-    // 🔥 YAHAN MAINEY overflow-x-hidden AUR w-full max-w-[100vw] LAGA DIYA HAI JO SCREEN KO LOCK KAR DEGA
+    // 🔥 SCREEN LOCK
     <div className="flex flex-col min-h-screen bg-background relative overflow-x-hidden w-full max-w-[100vw]">
       {/* Header Area */}
       <div className="p-6 shrink-0 flex justify-between items-center w-full max-w-md mx-auto z-10">
@@ -284,7 +287,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
             <AlertCircle className="w-16 h-16 text-white mb-2" />
             <span className="text-6xl font-headline font-bold text-white tracking-widest">SOS</span>
           </button>
-          {/* 🔥 DUSHMAN YAHAN THA (scale-125), AB MAIN WRAPPER NE ISKO KAAT DIYA HAI */}
           <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full scale-125 -z-0"></div>
         </div>
 
