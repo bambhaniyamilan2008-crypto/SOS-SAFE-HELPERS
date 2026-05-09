@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -7,7 +6,8 @@ import { AppScreen } from "../SafeHelpApp";
 import { 
   ArrowLeft, Moon, Type, MessageCircle, Mic, Zap, 
   Settings as SettingsIcon,
-  ChevronRight, UserCircle, LogOut, Globe, Sliders
+  ChevronRight, UserCircle, LogOut, Globe, Sliders,
+  Loader2
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -60,9 +60,25 @@ export default function Settings({ navigateTo, lang, setLang, t }: SettingsProps
   const [tempMessage, setTempMessage] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  // 🔥 FAST CACHE ENGINE: Get Settings Instantly from Memory
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const cachedSettings = localStorage.getItem('safehelp_fast_settings');
+      if (cachedSettings) {
+        try { 
+          setSettings(prev => ({ ...prev, ...JSON.parse(cachedSettings) })); 
+        } catch (e) {}
+      }
+    }
+  }, []);
+
+  // 🔥 BACKGROUND SYNC: Update from Firebase quietly
   useEffect(() => {
     if (remoteSettings) {
       setSettings(prev => ({ ...prev, ...remoteSettings }));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('safehelp_fast_settings', JSON.stringify(remoteSettings));
+      }
     }
   }, [remoteSettings]);
 
@@ -77,8 +93,16 @@ export default function Settings({ navigateTo, lang, setLang, t }: SettingsProps
   const updateSetting = (key: keyof typeof settings, value: any) => {
     if (!user || !db) return;
     const newSettings = { ...settings, [key]: value };
+    
+    // UI mein turant update karo (No Waiting)
     setSettings(newSettings);
     
+    // Cache mein turant update karo
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('safehelp_fast_settings', JSON.stringify(newSettings));
+    }
+    
+    // Firebase par background me bhejo
     const ref = doc(db, "users", user.uid, "settings", "default");
     setDoc(ref, newSettings, { merge: true });
     
@@ -136,7 +160,7 @@ export default function Settings({ navigateTo, lang, setLang, t }: SettingsProps
     </div>
   );
 
-  if (loading) return null;
+  // ❌ YAHAN SE 'if (loading) return null;' HATA DIYA GAYA HAI
 
   return (
     <div className="flex flex-col min-h-screen p-6 bg-background">
@@ -147,7 +171,15 @@ export default function Settings({ navigateTo, lang, setLang, t }: SettingsProps
           </Button>
           <h1 className="text-3xl font-headline font-bold">{t.settings}</h1>
         </div>
-        <SettingsIcon className="w-6 h-6 text-primary animate-spin-slow" />
+        
+        {/* Sync Indicator: Jab internet se data aa raha hoga tab ghoomega, warna ruk jayega */}
+        <div className="relative">
+          {loading ? (
+            <Loader2 className="w-6 h-6 text-primary animate-spin" />
+          ) : (
+            <SettingsIcon className="w-6 h-6 text-muted-foreground opacity-50" />
+          )}
+        </div>
       </div>
 
       <div className="flex-1 space-y-8 pb-24">
