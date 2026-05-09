@@ -1,9 +1,13 @@
 // lib/firebase.ts
-import { initializeApp, getApps, getApp } from "firebase/app";
-// 🔥 Naye Cache Engine ke imports add kiye
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import { 
+  getFirestore, 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager,
+  Firestore 
+} from "firebase/firestore";
 
-// Yahan hum .env.local se direct data le rahe hain
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -13,14 +17,22 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Singleton Pattern: Check if already initialized to prevent Turbopack errors
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// 🔥 Yahan Typescript ko bata diya ki ye variables kis type ke hain
+let app: FirebaseApp;
+let db: Firestore;
 
-// 🔥 MAIN FIX: Long polling hata diya aur Local Memory (Persistence) chalu kar di!
-// Ab app internet ka wait nahi karegi, memory se 0.1s me data dikhayegi.
-const db = initializeFirestore(app, { 
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-});
+if (!getApps().length) {
+  // Fresh Load (Naya Cache Engine)
+  app = initializeApp(firebaseConfig);
+  db = initializeFirestore(app, { 
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+  console.log("🔥 Firebase & Offline Cache Started!");
+} else {
+  // Hot-Reload (Purana Database uthao)
+  app = getApp();
+  db = getFirestore(app);
+  console.log("⚡ Firebase Hot-Reloaded Safely!");
+}
 
-// App aur database dono export kar rahe hain taaki baaki files me use kar sakein
 export { app, db };
