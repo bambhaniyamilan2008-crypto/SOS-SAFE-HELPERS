@@ -72,50 +72,57 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     }
   };
 
-  // 🔥 UNBLOCKED RESOLVE FUNCTION (I AM SAFE Button)
+  // 🔥 THE ULTIMATE SYNC FIX (Direct Update + Server Wait)
   const handleCancel = async () => {
     if (audioRef.current) audioRef.current.pause();
     
     try {
-      console.log("🚨 I AM SAFE Button Pressed! Searching Firebase...");
-      
-      // 1. Database se active alert dhundho
-      const q = query(collection(db, "alerts"), where("status", "==", "active"));
-      const querySnapshot = await getDocs(q);
+      console.log("🚨 I AM SAFE Button Pressed!");
 
-      console.log("Active Alerts Found:", querySnapshot.size);
+      // 1. Database mein update karne ke liye ID dhundho (Ref ya Storage se)
+      let targetId = alertIdRef.current;
+      if (!targetId && typeof window !== "undefined") {
+        targetId = localStorage.getItem("activeAlertId");
+      }
 
-      if (querySnapshot.empty) {
-        alert("⚠️ App ko Firebase mein koi 'active' alert nahi mila!");
+      if (targetId) {
+        // 🔥 DIRECT UPDATE (Sabse fast aur secure)
+        await updateDoc(doc(db, "alerts", targetId), {
+          status: "resolved",
+          resolvedAt: serverTimestamp()
+        });
+        console.log("✅ Direct Update Success for ID:", targetId);
       } else {
-        // 2. Sabko zabardasti 'resolved' karo
-        const updatePromises = querySnapshot.docs.map((alertDoc) => {
-          const docReference = doc(db, "alerts", alertDoc.id);
-          return updateDoc(docReference, {
+        // Backup: Agar ID nahi mili toh purana Query wala tarika
+        const q = query(collection(db, "alerts"), where("status", "==", "active"));
+        const querySnapshot = await getDocs(q);
+        const updatePromises = querySnapshot.docs.map((alertDoc) => 
+          updateDoc(doc(db, "alerts", alertDoc.id), {
             status: "resolved",
             resolvedAt: serverTimestamp()
-          });
-        });
-        
+          })
+        );
         await Promise.all(updatePromises);
-        console.log("✅ All alerts marked as resolved!");
-        
-        // 🔥 Screen par success dikhao
-        alert("✅ Dashboard Green Ho Gaya Hoga! Firebase Updated.");
+        console.log("✅ Query Update Success!");
       }
+
+      // Memory saaf karo
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("activeAlertId");
+      }
+
+      // 🔥 POPUP TO BLOCK SCREEN CLOSE
+      alert("✅ ALERT RESOLVED! Dashboard check karo.");
+
     } catch (error: any) {
       console.error("🔥 UPDATE ERROR:", error);
       alert("Error: " + error.message);
     }
 
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("activeAlertId");
-    }
-    
-    // 1 second ka wait taaki database 100% update ho jaye, phir screen band ho
+    // 🔥 MAIN FIX: Server ko data bhejne ka time do (2 Seconds)
     setTimeout(() => {
       onCancel(); 
-    }, 1000); 
+    }, 2000); 
   };
 
   const handleSendNow = () => {
