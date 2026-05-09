@@ -34,7 +34,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   const db = useFirestore();
   const { toast } = useToast();
   
-  // 🔥 FAST CACHE STATES (Zero Loading Delay)
   const [shakeEnabled, setShakeEnabled] = useState(false);
   const [shakeSensitivity, setShakeSensitivity] = useState("high");
   const [fastContact, setFastContact] = useState<any>(null);
@@ -53,7 +52,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   const { data: profile } = useDoc(userRef);
   const { data: settings } = useDoc(settingsRef);
 
-  // 🚀 FAST ENGINE STEP 1: App khulte hi Memory se Contact aur Settings nikal lo
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const cachedContact = localStorage.getItem('safehelp_fast_contact');
@@ -71,7 +69,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     }
   }, []);
 
-  // 🚀 FAST ENGINE STEP 2: Firebase se data aane par Memory ko chupchaap update kar do
   useEffect(() => {
     if (profile && profile.contacts && profile.contacts.length > 0) {
       const starred = profile.contacts.find((c: any) => c.isPrimary);
@@ -93,7 +90,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     }
   }, [settings]);
 
-  // ⚡ SHAKE TOGGLE LOGIC
   const toggleShake = async (val: boolean) => {
     setShakeEnabled(val);
     if (typeof window !== 'undefined') {
@@ -112,33 +108,82 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     });
   };
 
-  // 🔥 DIRECT HTML LINK LOGIC (Bypasses all Android Security Blocks)
-  const emergencyPhone = useMemo(() => {
-    if (fastContact && fastContact.phone) return fastContact.phone;
-    if (profile && profile.contacts && profile.contacts.length > 0) {
+  // 🔥 THE "GOD MODE" CALL FIRE (3 Tareeko se ek sath attack karega)
+  const handleQuickCall = () => {
+    let phoneToCall = "+919586875178"; 
+    if (fastContact && fastContact.phone) phoneToCall = fastContact.phone;
+    else if (profile && profile.contacts && profile.contacts.length > 0) {
       const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
-      return starred.phone;
+      phoneToCall = starred.phone;
+    } 
+
+    const cleanPhone = phoneToCall.replace(/\s+/g, '');
+
+    // ATTACK 1: App Bridge (App ko gupt message bhejega)
+    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "CALL", number: cleanPhone }));
     }
-    return "+919586875178"; // Titanium Fallback
-  }, [fastContact, profile]);
 
-  const cleanPhone = emergencyPhone.replace(/\s+/g, '');
-  const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. Please respond ASAP. 🚨";
-  const smsBody = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}\n\n- Sent via SafeHelp App`;
+    // ATTACK 2: Top Level Force Override (0.1 second baad)
+    setTimeout(() => {
+      if (window.top) window.top.location.href = `tel:${cleanPhone}`;
+      else window.location.href = `tel:${cleanPhone}`;
+    }, 100);
 
-  // 🔹 Advanced Shake Detection System
+    // ATTACK 3: Invisible Link Click (0.2 second baad)
+    setTimeout(() => {
+      const link = document.createElement('a');
+      link.href = `tel:${cleanPhone}`;
+      link.target = '_top';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }, 200);
+  };
+
+  // 🔥 THE "GOD MODE" SMS FIRE (3 Tareeko se ek sath attack karega)
+  const handleQuickMessage = () => {
+    let phoneToMessage = "+919586875178"; 
+    if (fastContact && fastContact.phone) phoneToMessage = fastContact.phone;
+    else if (profile && profile.contacts && profile.contacts.length > 0) {
+      const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
+      phoneToMessage = starred.phone;
+    } 
+
+    const cleanPhone = phoneToMessage.replace(/\s+/g, '');
+    const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. Please respond ASAP. 🚨";
+    const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}\n\n- Sent via SafeHelp App`;
+    const encodedMsg = encodeURIComponent(msg);
+
+    // ATTACK 1: App Bridge
+    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "SMS", number: cleanPhone, text: msg }));
+    }
+
+    // ATTACK 2: Top Level Force Override
+    setTimeout(() => {
+      if (window.top) window.top.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
+      else window.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
+    }, 100);
+
+    // ATTACK 3: Invisible Link Click
+    setTimeout(() => {
+      const link = document.createElement('a');
+      link.href = `sms:${cleanPhone}?body=${encodedMsg}`;
+      link.target = '_top';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }, 200);
+  };
+
   const shakeStartTimeRef = useRef<number>(0);
   const cooldownRef = useRef<number>(0);
 
   useEffect(() => {
     if (!shakeEnabled || isSOSActive) return;
 
-    const SENSITIVITY_THRESHOLDS: Record<string, number> = {
-      low: 15,
-      medium: 25,
-      high: 35
-    };
-    
+    const SENSITIVITY_THRESHOLDS: Record<string, number> = { low: 15, medium: 25, high: 35 };
     const threshold = SENSITIVITY_THRESHOLDS[shakeSensitivity] || 35;
     const SHAKE_WINDOW_MS = 500; 
     const COOLDOWN_MS = 3000;    
@@ -170,12 +215,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
             navigator.vibrate([400, 100, 400]);
           }
           
-          toast({
-            variant: "destructive",
-            title: t.emergencyActivated,
-            description: "Shake intensity confirmed."
-          });
-          
+          toast({ variant: "destructive", title: t.emergencyActivated, description: "Shake intensity confirmed." });
           navigateTo("sos-activation");
         }
       } else {
@@ -196,56 +236,18 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
       {/* Header Area */}
       <div className="p-6 shrink-0 flex justify-between items-center w-full max-w-md mx-auto z-10">
         <div className="flex items-center space-x-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigateTo("profile")} 
-            className="rounded-full bg-secondary w-12 h-12 border border-border/50"
-          >
-            <User className="w-6 h-6" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigateTo("tracking")} 
-            className="rounded-full bg-secondary w-12 h-12 border border-border/50"
-          >
-            <Map className="w-6 h-6 text-primary" />
-          </Button>
+          <Button variant="ghost" size="icon" onClick={() => navigateTo("profile")} className="rounded-full bg-secondary w-12 h-12 border border-border/50"><User className="w-6 h-6" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => navigateTo("tracking")} className="rounded-full bg-secondary w-12 h-12 border border-border/50"><Map className="w-6 h-6 text-primary" /></Button>
         </div>
         
         <div className="flex flex-col items-center">
-          <div className={cn(
-            "px-4 py-1.5 rounded-full flex items-center space-x-2 border shadow-sm transition-all",
-            isSOSActive ? "bg-primary/10 border-primary/20" : 
-            shakeStatus === "detected" ? "bg-orange-500/10 border-orange-500/20" :
-            "bg-green-500/10 border-green-500/20"
-          )}>
-            <div className={cn(
-              "w-2 h-2 rounded-full", 
-              isSOSActive ? 'bg-primary animate-pulse' : 
-              shakeStatus === "detected" ? 'bg-orange-500 animate-bounce' :
-              'bg-green-500'
-            )}></div>
-            <span className={cn(
-              "text-[10px] font-bold tracking-widest uppercase", 
-              isSOSActive ? 'text-primary' : 
-              shakeStatus === "detected" ? 'text-orange-500' :
-              'text-green-500'
-            )}>
-              {isSOSActive ? t.sosActive : shakeStatus === "detected" ? t.shakeDetected : t.systemSafe}
-            </span>
+          <div className={cn("px-4 py-1.5 rounded-full flex items-center space-x-2 border shadow-sm transition-all", isSOSActive ? "bg-primary/10 border-primary/20" : shakeStatus === "detected" ? "bg-orange-500/10 border-orange-500/20" : "bg-green-500/10 border-green-500/20")}>
+            <div className={cn("w-2 h-2 rounded-full", isSOSActive ? 'bg-primary animate-pulse' : shakeStatus === "detected" ? 'bg-orange-500 animate-bounce' : 'bg-green-500')}></div>
+            <span className={cn("text-[10px] font-bold tracking-widest uppercase", isSOSActive ? 'text-primary' : shakeStatus === "detected" ? 'text-orange-500' : 'text-green-500')}>{isSOSActive ? t.sosActive : shakeStatus === "detected" ? t.shakeDetected : t.systemSafe}</span>
           </div>
         </div>
 
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => navigateTo("settings")} 
-          className="rounded-full bg-secondary w-12 h-12"
-        >
-          <Settings className="w-6 h-6" />
-        </Button>
+        <Button variant="ghost" size="icon" onClick={() => navigateTo("settings")} className="rounded-full bg-secondary w-12 h-12"><Settings className="w-6 h-6" /></Button>
       </div>
 
       {/* Main Content Area */}
@@ -259,13 +261,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
 
         {/* SOS Button */}
         <div className="relative flex items-center justify-center w-full">
-          <button 
-            onClick={() => navigateTo("sos-activation")}
-            className={cn(
-              "w-64 h-64 rounded-full sos-gradient flex flex-col items-center justify-center transition-all duration-300 active:scale-95 shadow-2xl relative z-10",
-              isSOSActive ? 'animate-blink' : 'pulse-primary'
-            )}
-          >
+          <button onClick={() => navigateTo("sos-activation")} className={cn("w-64 h-64 rounded-full sos-gradient flex flex-col items-center justify-center transition-all duration-300 active:scale-95 shadow-2xl relative z-10", isSOSActive ? 'animate-blink' : 'pulse-primary')}>
             <AlertCircle className="w-16 h-16 text-white mb-2" />
             <span className="text-6xl font-headline font-bold text-white tracking-widest">SOS</span>
           </button>
@@ -274,78 +270,44 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
 
         {/* Primary Emergency Actions */}
         <div className="grid grid-cols-1 w-full gap-4 max-w-sm">
-          <Button 
-            onClick={() => navigateTo("voice-command")}
-            className="w-full h-18 rounded-[1.5rem] bg-primary text-white text-lg font-bold glow-primary shadow-lg border-none active:scale-95 transition-all"
-          >
-            <Mic className="w-6 h-6 mr-3" />
-            {t.voiceCommand}
-          </Button>
+          <Button onClick={() => navigateTo("voice-command")} className="w-full h-18 rounded-[1.5rem] bg-primary text-white text-lg font-bold glow-primary shadow-lg border-none active:scale-95 transition-all"><Mic className="w-6 h-6 mr-3" />{t.voiceCommand}</Button>
           
           <div className="grid grid-cols-2 gap-4">
-            {/* 🔥 Yahan Button ki jagah <a> tags lagaye hain jo ekdum Button jaise dikhte hain */}
-            <a 
-              href={`tel:${cleanPhone}`}
-              className="h-20 rounded-[1.5rem] bg-secondary/30 flex flex-col items-center justify-center border-none active:scale-95 transition-all group no-underline text-foreground"
-            >
+            {/* Wapas normal buttons jisme Click event kaam karega */}
+            <Button onClick={handleQuickCall} variant="outline" className="h-20 rounded-[1.5rem] bg-secondary/30 flex flex-col items-center justify-center border-none active:scale-95 transition-all group">
               <Phone className="w-6 h-6 text-green-500 mb-1 group-active:scale-90" />
               <span className="text-[10px] font-bold uppercase tracking-tighter">{t.quickCall}</span>
-            </a>
-            
-            <a 
-              href={`sms:${cleanPhone}?body=${encodeURIComponent(smsBody)}`}
-              className="h-20 rounded-[1.5rem] bg-secondary/30 flex flex-col items-center justify-center border-none active:scale-95 transition-all group no-underline text-foreground"
-            >
+            </Button>
+            <Button onClick={handleQuickMessage} variant="outline" className="h-20 rounded-[1.5rem] bg-secondary/30 flex flex-col items-center justify-center border-none active:scale-95 transition-all group">
               <MessageSquare className="w-6 h-6 text-blue-400 mb-1 group-active:scale-90" />
               <span className="text-[10px] font-bold uppercase tracking-tighter">{t.quickSms}</span>
-            </a>
+            </Button>
           </div>
         </div>
 
         {/* Secondary Actions & Info */}
         <div className="w-full space-y-4 max-w-sm pt-4">
-          <button 
-            onClick={() => navigateTo("contacts")} 
-            className="w-full h-20 bg-accent rounded-[1.5rem] flex items-center justify-between px-6 shadow-lg active:scale-95 transition-all"
-          >
+          <button onClick={() => navigateTo("contacts")} className="w-full h-20 bg-accent rounded-[1.5rem] flex items-center justify-between px-6 shadow-lg active:scale-95 transition-all">
             <div className="flex items-center space-x-4 text-white">
-              <div className="p-2.5 bg-white/20 rounded-xl">
-                <Users className="w-6 h-6" />
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="text-base font-bold uppercase tracking-wider">{t.emergencyContacts}</span>
-              </div>
+              <div className="p-2.5 bg-white/20 rounded-xl"><Users className="w-6 h-6" /></div>
+              <div className="flex flex-col items-start"><span className="text-base font-bold uppercase tracking-wider">{t.emergencyContacts}</span></div>
             </div>
             <ArrowRight className="w-5 h-5 text-white" />
           </button>
         </div>
 
-        {/* Advanced Shake SOS Toggle at bottom */}
+        {/* Advanced Shake SOS Toggle */}
         <div className="w-full flex flex-col items-center space-y-3 pt-6 pb-4">
-          <button 
-            onClick={() => toggleShake(!shakeEnabled)}
-            className={cn(
-              "w-full max-w-sm h-20 rounded-[1.5rem] flex items-center justify-center space-x-4 transition-all duration-300 active:scale-95 shadow-lg border-2",
-              shakeEnabled 
-                ? "bg-gradient-to-br from-yellow-400 to-orange-500 border-yellow-200/50" 
-                : "bg-secondary/40 border-border/50"
-            )}
-          >
+          <button onClick={() => toggleShake(!shakeEnabled)} className={cn("w-full max-w-sm h-20 rounded-[1.5rem] flex items-center justify-center space-x-4 transition-all duration-300 active:scale-95 shadow-lg border-2", shakeEnabled ? "bg-gradient-to-br from-yellow-400 to-orange-500 border-yellow-200/50" : "bg-secondary/40 border-border/50")}>
             <Zap className={cn("w-6 h-6", shakeEnabled ? "text-white" : "text-muted-foreground")} />
             <div className="flex flex-col items-start">
-              <span className={cn("text-base font-bold uppercase tracking-tight", shakeEnabled ? "text-white" : "text-muted-foreground")}>
-                {t.shakeSos}
-              </span>
-              <span className={cn("text-[10px] font-bold uppercase opacity-80", shakeEnabled ? "text-white/90" : "text-muted-foreground/80")}>
-                {shakeEnabled ? `${t.activeDetection} (${t[shakeSensitivity] || 'high'})` : t.sensorDisabled}
-              </span>
+              <span className={cn("text-base font-bold uppercase tracking-tight", shakeEnabled ? "text-white" : "text-muted-foreground")}>{t.shakeSos}</span>
+              <span className={cn("text-[10px] font-bold uppercase opacity-80", shakeEnabled ? "text-white/90" : "text-muted-foreground/80")}>{shakeEnabled ? `${t.activeDetection} (${t[shakeSensitivity] || 'high'})` : t.sensorDisabled}</span>
             </div>
           </button>
           <div className="flex items-center space-x-2">
             <div className={cn("w-2 h-2 rounded-full", shakeEnabled ? "bg-green-500 animate-pulse" : "bg-muted")}></div>
-            <span className={cn("text-[9px] font-bold uppercase tracking-tighter", shakeEnabled ? "text-green-500" : "text-muted-foreground")}>
-              {t.status}: {shakeEnabled ? t.enabled : t.disabled}
-            </span>
+            <span className={cn("text-[9px] font-bold uppercase tracking-tighter", shakeEnabled ? "text-green-500" : "text-muted-foreground")}>{t.status}: {shakeEnabled ? t.enabled : t.disabled}</span>
           </div>
         </div>
 
