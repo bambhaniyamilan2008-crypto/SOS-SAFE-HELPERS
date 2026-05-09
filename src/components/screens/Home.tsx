@@ -52,6 +52,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   const { data: profile } = useDoc(userRef);
   const { data: settings } = useDoc(settingsRef);
 
+  // 🔥 SCREEN LOCK EFFECT
   useEffect(() => {
     document.body.style.overflowX = 'hidden';
     document.documentElement.style.overflowX = 'hidden';
@@ -95,18 +96,30 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     }
   }, [settings]);
 
-  // 🔥 AUDIO TRIGGER BYPASS
   const handleSOSClick = () => {
+    // 🔥 STEP 1: Audio ko 'Unlock' karo aur Window par save karo
     try {
       const API_KEY = "66def89da92b48fbbc5ee6b34eab3456";
-      const audio = new Audio(`https://api.voicerss.org/?key=${API_KEY}&src=ready`);
-      audio.volume = 0;
-      audio.play().catch(() => {});
-    } catch (e) {}
+      const audioUrl = `https://api.voicerss.org/?key=${API_KEY}&hl=en-in&v=Jai&c=MP3&src=SOS%20Activated`;
+      
+      // Ek invisible audio object banao jo click ke sath hi "Load" ho jaye
+      const sosAudio = new Audio(audioUrl);
+      sosAudio.load(); 
+      
+      // Isko window object mein daal do taaki dusri screen isse utha sake
+      (window as any).sosVoice = sosAudio;
+      
+      // Ek silent play taaki browser permission mil jaye
+      sosAudio.play().then(() => {
+        sosAudio.pause(); // Turant pause karo, Activation screen par bajayenge
+        sosAudio.currentTime = 0;
+      }).catch(() => {});
+    } catch (e) {
+      console.error("Trigger error", e);
+    }
     
     navigateTo("sos-activation");
   };
-
   const toggleShake = async (val: boolean) => {
     setShakeEnabled(val);
     if (typeof window !== 'undefined') {
@@ -285,7 +298,11 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
         </div>
 
         <div className="relative flex items-center justify-center w-full">
-          <button onClick={handleSOSClick} className={cn("w-64 h-64 rounded-full sos-gradient flex flex-col items-center justify-center transition-all duration-300 active:scale-95 shadow-2xl relative z-10", isSOSActive ? 'animate-blink' : 'pulse-primary')}>
+          {/* 🔥 MODIFIED SOS BUTTON WITH TRIGGER */}
+          <button 
+            onClick={handleSOSClick} 
+            className={cn("w-64 h-64 rounded-full sos-gradient flex flex-col items-center justify-center transition-all duration-300 active:scale-95 shadow-2xl relative z-10", isSOSActive ? 'animate-blink' : 'pulse-primary')}
+          >
             <AlertCircle className="w-16 h-16 text-white mb-2" />
             <span className="text-6xl font-headline font-bold text-white tracking-widest">SOS</span>
           </button>
@@ -330,7 +347,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
             <span className={cn("text-[9px] font-bold uppercase tracking-tighter", shakeEnabled ? "text-green-500" : "text-muted-foreground")}>{t.status}: {shakeEnabled ? t.enabled : t.disabled}</span>
           </div>
         </div>
-
       </div>
     </div>
   );

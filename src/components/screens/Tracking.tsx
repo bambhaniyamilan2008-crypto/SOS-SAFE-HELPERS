@@ -33,7 +33,7 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   
   const [coords, setCoords] = useState<[number, number]>(DEFAULT_COORDS);
-  const [lastUpdate, setLastUpdate] = useState<string>("Locating...");
+  const [lastUpdate, setLastUpdate] = useState<string>("Initializing GPS...");
   const [mapType, setMapType] = useState<"normal" | "satellite">("normal");
   const [heading, setHeading] = useState<number>(0);
   const [isMounted, setIsMounted] = useState(false);
@@ -80,6 +80,7 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     }
   }, [profile]);
 
+  // 🔥 THE MASTER LOCATION ENGINE (Dual-Engine Aggressive Lock)
   useEffect(() => {
     setIsMounted(true);
     const loadLeaflet = async () => {
@@ -98,42 +99,75 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     loadLeaflet();
 
     let watchId: number;
+    let intervalId: any;
 
     if ("geolocation" in navigator) {
-      // 🔥 HIGH ACCURACY AGGRESSIVE LOCK
       const geoOptions = { 
-        enableHighAccuracy: true, 
-        timeout: 10000, 
-        maximumAge: 0 
+        enableHighAccuracy: true, // Force GPS Hardware
+        timeout: 5000, 
+        maximumAge: 0 // No cached location allowed
       };
 
-      const handleSuccess = (position: GeolocationPosition) => {
+      const updateLocation = (position: GeolocationPosition) => {
         const newCoords: [number, number] = [position.coords.latitude, position.coords.longitude];
-        setCoords(newCoords);
         
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.setView(newCoords, mapInstanceRef.current.getZoom(), { animate: true });
-        }
+        // Sirf tabhi update karo jab location sach mein badle (Jitter roko)
+        setCoords(prev => {
+          if (prev[0] !== newCoords[0] || prev[1] !== newCoords[1]) {
+            return newCoords;
+          }
+          return prev;
+        });
 
         const now = new Date();
         setLastUpdate(`${t.lastUpdate}: ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`);
         if (position.coords.heading !== null) setHeading(position.coords.heading);
       };
 
-      watchId = navigator.geolocation.watchPosition(handleSuccess, () => {
-        setLastUpdate(t.gpsWeak);
-      }, geoOptions);
+      // ENGINE 1: Standard Watch (Passive Listener)
+      watchId = navigator.geolocation.watchPosition(
+        updateLocation,
+        (err) => {
+          console.log("GPS Watch Error:", err);
+          setLastUpdate("Re-connecting GPS...");
+        },
+        geoOptions
+      );
+
+      // ENGINE 2: The Shock Engine (Force Active Ping every 3 seconds)
+      intervalId = setInterval(() => {
+        navigator.geolocation.getCurrentPosition(
+          updateLocation,
+          () => {}, // Ignore errors for shock engine
+          geoOptions
+        );
+      }, 3000); // 3 Second ka jhatka!
     }
 
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
+      if (intervalId) clearInterval(intervalId);
     };
   }, [t.lastUpdate, t.gpsWeak]);
 
+  // AUTO-CAMERA PANNING
+  useEffect(() => {
+    if (mapInstanceRef.current && coords[0] !== DEFAULT_COORDS[0]) {
+      mapInstanceRef.current.setView(coords, mapInstanceRef.current.getZoom(), {
+        animate: true,
+        duration: 0.5
+      });
+    }
+  }, [coords]);
+
   const handleShare = async () => {
-    const url = `https://maps.google.com/?q=${coords[0]},${coords[1]}`;
+    const lat = coords[0];
+    const lng = coords[1];
+    const url = `https://maps.google.com/?q=${lat},${lng}`;
     if (navigator.share) {
-      try { await navigator.share({ title: 'SafeHelp SOS', text: '🚨 EMERGENCY! Live tracking:', url }); } catch (err) {}
+      try {
+        await navigator.share({ title: 'SafeHelp SOS', text: '🚨 EMERGENCY! I need help immediately. My live tracking:', url });
+      } catch (err) {}
     } else {
       navigator.clipboard.writeText(url);
       toast({ title: "Link Copied" });
@@ -149,12 +183,15 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     } 
 
     const cleanPhone = phoneToMessage.replace(/\s+/g, '');
-    const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. Live location attached below. 🚨";
-    const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}\n\n📍 Live Tracking: https://maps.google.com/?q=${coords[0]},${coords[1]}\n\n- Sent via SafeHelp App`;
-    const encodedMsg = encodeURIComponent(msg);
+    const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. My live location is attached below. Please respond ASAP. 🚨";
+    const lat = coords[0];
+    const lng = coords[1];
+    
+    const messageBody = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}\n\n📍 Live Tracking: https://maps.google.com/?q=${lat},${lng}\n\n- Sent via SafeHelp App`;
+    const encodedMsg = encodeURIComponent(messageBody);
 
     if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
-      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "SMS", number: cleanPhone, text: msg }));
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "SMS", number: cleanPhone, text: messageBody }));
     }
 
     setTimeout(() => {
@@ -201,6 +238,22 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     }, 200);
   };
 
+  const customMarkerIcon = useMemo(() => {
+    if (!leafletLoaded || !LRef.current) return null;
+    return LRef.current.divIcon({
+      className: 'custom-div-icon',
+      html: `
+        <div class="relative flex items-center justify-center" style="transform: rotate(${heading}deg);">
+          <div class="absolute w-12 h-12 bg-primary/30 rounded-full animate-ping"></div>
+          <div class="relative w-10 h-10 bg-primary rounded-full border-4 border-white flex items-center justify-center shadow-lg">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="white"><polygon points="12 2 19 21 12 17 5 21 12 2"/></svg>
+          </div>
+        </div>`,
+      iconSize: [40, 40],
+      iconAnchor: [20, 20]
+    });
+  }, [heading, leafletLoaded]);
+
   if (!isMounted) return null;
 
   return (
@@ -209,7 +262,7 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
         {leafletLoaded && MapContainerRef.current ? (
           <MapContainerRef.current 
             center={coords} 
-            zoom={18} 
+            zoom={16} 
             zoomControl={false}
             style={{ height: '100%', width: '100%' }}
             attributionControl={false}
@@ -220,22 +273,12 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
                 ? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
                 : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"}
             />
-            {MarkerRef.current && (
-              <MarkerRef.current position={coords} icon={LRef.current.divIcon({
-                className: 'custom-div-icon',
-                html: `<div class="relative w-10 h-10 bg-primary rounded-full border-4 border-white shadow-2xl flex items-center justify-center">
-                         <div class="absolute inset-0 bg-primary/40 rounded-full animate-ping"></div>
-                         <div class="w-3 h-3 bg-white rounded-full"></div>
-                       </div>`,
-                iconSize: [40, 40],
-                iconAnchor: [20, 20]
-              })} />
-            )}
+            {customMarkerIcon && <MarkerRef.current position={coords} icon={customMarkerIcon} />}
           </MapContainerRef.current>
         ) : (
           <div className="flex flex-col items-center space-y-4">
             <Loader2 className="w-12 h-12 animate-spin text-primary" />
-            <p className="font-bold text-muted-foreground text-xs tracking-widest uppercase">Initializing Satellites...</p>
+            <p className="font-bold text-muted-foreground uppercase tracking-widest text-xs">Loading Live Map...</p>
           </div>
         )}
       </div>
@@ -243,16 +286,15 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
       <div className="absolute top-0 left-0 right-0 z-10 p-6 flex flex-col space-y-3 pointer-events-none">
         <div className="flex items-start justify-between pointer-events-auto">
            <div className="flex flex-col space-y-2">
-             <div className="backdrop-blur-xl bg-primary text-white border border-white/20 rounded-full px-5 py-2.5 flex items-center space-x-3 shadow-2xl">
+             <div className="backdrop-blur-xl border rounded-full px-5 py-2.5 flex items-center space-x-3 bg-primary text-white border-primary/20 shadow-2xl">
                 <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></div>
-                <span className="text-[11px] font-bold uppercase tracking-widest">Precision Live Tracking</span>
+                <span className="text-[11px] font-bold uppercase tracking-widest">{t.liveTracking}</span>
              </div>
              <div className="backdrop-blur-md bg-black/50 border border-white/10 rounded-full px-4 py-2 self-start shadow-lg flex items-center space-x-2">
                 <Clock className="w-3.5 h-3.5 text-primary" />
                 <span className="text-[10px] font-bold text-white uppercase tracking-wider">{lastUpdate}</span>
              </div>
            </div>
-           
            <Button variant="ghost" size="icon" onClick={handleShare} className="bg-background/90 rounded-full w-12 h-12 shadow-xl border border-border/50">
              <Share2 className="w-6 h-6 text-primary" />
            </Button>
