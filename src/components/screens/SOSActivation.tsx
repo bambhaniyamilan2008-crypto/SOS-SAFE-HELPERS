@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 
 // 🔥 STEP 2: Firebase imports add kiye
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/firebase"; // DHYAN RAHE: Apne firebase.js ka sahi path daalna
+// SOSActivation.tsx mein ise check karo
+import { db } from "@/lib/firebase"; // Agar 'lib' folder ke andar hai
 
 interface SOSActivationProps {
   onCancel: () => void;
