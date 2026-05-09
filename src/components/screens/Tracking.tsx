@@ -33,7 +33,7 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   
   const [coords, setCoords] = useState<[number, number]>(DEFAULT_COORDS);
-  const [lastUpdate, setLastUpdate] = useState<string>("Initializing...");
+  const [lastUpdate, setLastUpdate] = useState<string>("Initializing GPS...");
   const [mapType, setMapType] = useState<"normal" | "satellite">("normal");
   const [heading, setHeading] = useState<number>(0);
   const [isMounted, setIsMounted] = useState(false);
@@ -80,6 +80,7 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     }
   }, [profile]);
 
+  // 🔥 THE MASTER LOCATION ENGINE (Dual-Engine Aggressive Lock)
   useEffect(() => {
     setIsMounted(true);
     const loadLeaflet = async () => {
@@ -98,34 +99,60 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     loadLeaflet();
 
     let watchId: number;
+    let intervalId: any;
+
     if ("geolocation" in navigator) {
-      // 🔥 FIX 1: Strict GPS Tracking for Real-time accuracy
+      const geoOptions = { 
+        enableHighAccuracy: true, // Force GPS Hardware
+        timeout: 5000, 
+        maximumAge: 0 // No cached location allowed
+      };
+
+      const updateLocation = (position: GeolocationPosition) => {
+        const newCoords: [number, number] = [position.coords.latitude, position.coords.longitude];
+        
+        // Sirf tabhi update karo jab location sach mein badle (Jitter roko)
+        setCoords(prev => {
+          if (prev[0] !== newCoords[0] || prev[1] !== newCoords[1]) {
+            return newCoords;
+          }
+          return prev;
+        });
+
+        const now = new Date();
+        setLastUpdate(`${t.lastUpdate}: ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`);
+        if (position.coords.heading !== null) setHeading(position.coords.heading);
+      };
+
+      // ENGINE 1: Standard Watch (Passive Listener)
       watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const newCoords: [number, number] = [position.coords.latitude, position.coords.longitude];
-          setCoords(newCoords);
-          const now = new Date();
-          setLastUpdate(`${t.lastUpdate}: ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`);
-          if (position.coords.heading !== null) setHeading(position.coords.heading);
-        },
+        updateLocation,
         (err) => {
-          console.log("GPS Tracking Error:", err);
-          setLastUpdate(t.gpsWeak);
+          console.log("GPS Watch Error:", err);
+          setLastUpdate("Re-connecting GPS...");
         },
-        // Force Maximum Accuracy & Disable old cached locations
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        geoOptions
       );
+
+      // ENGINE 2: The Shock Engine (Force Active Ping every 3 seconds)
+      intervalId = setInterval(() => {
+        navigator.geolocation.getCurrentPosition(
+          updateLocation,
+          () => {}, // Ignore errors for shock engine
+          geoOptions
+        );
+      }, 3000); // 3 Second ka jhatka!
     }
 
     return () => {
       if (watchId) navigator.geolocation.clearWatch(watchId);
+      if (intervalId) clearInterval(intervalId);
     };
   }, [t.lastUpdate, t.gpsWeak]);
 
-  // 🔥 FIX 2: AUTO-CAMERA PANNING (Jise hi user hilega, Map camera follow karega)
+  // AUTO-CAMERA PANNING
   useEffect(() => {
     if (mapInstanceRef.current && coords[0] !== DEFAULT_COORDS[0]) {
-      // Map ko nayi location par center karo
       mapInstanceRef.current.setView(coords, mapInstanceRef.current.getZoom(), {
         animate: true,
         duration: 0.5
@@ -231,7 +258,6 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
 
   return (
     <div className="flex flex-col h-screen bg-background relative overflow-hidden" ref={mapContainerRef}>
-      {/* MAP LAYER */}
       <div className="absolute inset-0 z-0 bg-secondary/20 flex items-center justify-center">
         {leafletLoaded && MapContainerRef.current ? (
           <MapContainerRef.current 
@@ -257,7 +283,6 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
         )}
       </div>
 
-      {/* TOP OVERLAYS - GPS STATUS INDICATORS */}
       <div className="absolute top-0 left-0 right-0 z-10 p-6 flex flex-col space-y-3 pointer-events-none">
         <div className="flex items-start justify-between pointer-events-auto">
            <div className="flex flex-col space-y-2">
@@ -265,28 +290,23 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
                 <div className="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></div>
                 <span className="text-[11px] font-bold uppercase tracking-widest">{t.liveTracking}</span>
              </div>
-             
-             {/* GPS TIME INDICATOR */}
              <div className="backdrop-blur-md bg-black/50 border border-white/10 rounded-full px-4 py-2 self-start shadow-lg flex items-center space-x-2">
                 <Clock className="w-3.5 h-3.5 text-primary" />
                 <span className="text-[10px] font-bold text-white uppercase tracking-wider">{lastUpdate}</span>
              </div>
            </div>
-           
            <Button variant="ghost" size="icon" onClick={handleShare} className="bg-background/90 rounded-full w-12 h-12 shadow-xl border border-border/50">
              <Share2 className="w-6 h-6 text-primary" />
            </Button>
         </div>
       </div>
 
-      {/* MAP CONTROLS */}
       <div className="absolute right-6 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center space-y-4">
         <Button onClick={() => mapInstanceRef.current?.zoomIn()} className="w-12 h-12 rounded-2xl bg-background/95 shadow-2xl text-primary border border-border/50"><Plus className="w-6 h-6" /></Button>
         <Button onClick={() => mapInstanceRef.current?.zoomOut()} className="w-12 h-12 rounded-2xl bg-background/95 shadow-2xl text-primary border border-border/50"><Minus className="w-6 h-6" /></Button>
         <Button onClick={() => setMapType(prev => prev === "normal" ? "satellite" : "normal")} className="w-12 h-12 rounded-2xl bg-background/95 shadow-2xl text-primary border border-border/50"><Layers className="w-6 h-6" /></Button>
       </div>
 
-      {/* BOTTOM PANEL */}
       <div className="absolute bottom-0 left-0 right-0 z-10 p-6 pointer-events-none">
         <div className="max-w-md mx-auto w-full flex flex-col space-y-4 items-end">
           <Button 
