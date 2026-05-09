@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 import { MapPin, X, Check, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// 🔥 STEP 2: Firebase imports add kiye
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/firebase"; // DHYAN RAHE: Apne firebase.js ka sahi path daalna
+
 interface SOSActivationProps {
   onCancel: () => void;
   onActivated: () => void;
@@ -20,31 +24,37 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   const isActionDoneRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null); 
 
-  // 🔥 GOD MODE VOICE: Direct Audio Object Bypass
+  // 🔥 GOD MODE VOICE
   const speakSOS = () => {
     const API_KEY = "66def89da92b48fbbc5ee6b34eab3456"; 
-    
     try {
-      // Direct URL injection for faster response
       const audioUrl = `https://api.voicerss.org/?key=${API_KEY}&hl=en-in&v=Jai&c=MP3&src=SOS%20Activated`;
       const audio = new Audio(audioUrl);
       audio.volume = 1.0;
       audioRef.current = audio;
-
       const playPromise = audio.play();
       if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log("Autoplay blocked. User must touch screen.");
-          // Agar autoplay block hota hai toh silent fail hoga bina crash ke
-        });
+        playPromise.catch(error => console.log("Autoplay blocked."));
       }
-    } catch (error) {
-      console.error("Voice Error:", error);
+    } catch (error) { console.error("Voice Error:", error); }
+  };
+
+  // 🚀 STEP 2 Livelink: Firebase ko alert bhejne wala function
+  const fireDashboardAlert = async () => {
+    try {
+      await addDoc(collection(db, "alerts"), {
+        userId: "user_" + Math.floor(Math.random() * 10000), // Abhi ke liye random ID, baad mein real user id daal dena
+        status: "active",
+        timestamp: serverTimestamp(),
+        type: "panic_button"
+      });
+      console.log("🚨 FIREBASE PAR ALERT BHEJ DIYA GAYA HAI!");
+    } catch (e) { 
+      console.error("Firebase Error: ", e); 
     }
   };
 
   useEffect(() => {
-    // 500ms ka delay taaki transitions smooth ho jaye aur browser ready ho
     const audioTimer = setTimeout(() => {
       if (!hasSpokenRef.current) {
         speakSOS();
@@ -52,7 +62,6 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       }
     }, 500);
 
-    // Geolocation fix
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         () => setLocationStatus(t.locationAttached),
@@ -62,9 +71,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     }
 
     const statusTimer = setTimeout(() => {
-      if (!isActionDoneRef.current) {
-        setMessageStatus(t.sendingSms);
-      }
+      if (!isActionDoneRef.current) setMessageStatus(t.sendingSms);
     }, 1500);
 
     return () => {
@@ -82,24 +89,24 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       }, 1000);
       return () => clearTimeout(timer);
     } else {
+      // 🔥 TIMER 0 HOTE HI FIREBASE PAR ALERT BHEJO
       isActionDoneRef.current = true;
+      fireDashboardAlert(); // <-- Call kiya
       onActivated();
     }
   }, [countdown, onActivated]);
 
   const handleCancel = () => {
     isActionDoneRef.current = true; 
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+    if (audioRef.current) audioRef.current.pause();
     onCancel();
   };
 
   const handleSendNow = () => {
+    // 🔥 SEND NOW DABATE HI FIREBASE PAR ALERT BHEJO
     isActionDoneRef.current = true; 
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+    if (audioRef.current) audioRef.current.pause();
+    fireDashboardAlert(); // <-- Call kiya
     onActivated();
   };
 
