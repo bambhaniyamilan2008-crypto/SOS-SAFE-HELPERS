@@ -96,19 +96,30 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     }
   }, [settings]);
 
-  // 🔥 AUDIO PERMISSION BYPASS: SOS Click trigger
   const handleSOSClick = () => {
-    // Silent trigger taaki browser audio permission unlock ho jaye
+    // 🔥 STEP 1: Audio ko 'Unlock' karo aur Window par save karo
     try {
       const API_KEY = "66def89da92b48fbbc5ee6b34eab3456";
-      const audio = new Audio(`https://api.voicerss.org/?key=${API_KEY}&src=ready`);
-      audio.volume = 0;
-      audio.play().catch(() => {});
-    } catch (e) {}
+      const audioUrl = `https://api.voicerss.org/?key=${API_KEY}&hl=en-in&v=Jai&c=MP3&src=SOS%20Activated`;
+      
+      // Ek invisible audio object banao jo click ke sath hi "Load" ho jaye
+      const sosAudio = new Audio(audioUrl);
+      sosAudio.load(); 
+      
+      // Isko window object mein daal do taaki dusri screen isse utha sake
+      (window as any).sosVoice = sosAudio;
+      
+      // Ek silent play taaki browser permission mil jaye
+      sosAudio.play().then(() => {
+        sosAudio.pause(); // Turant pause karo, Activation screen par bajayenge
+        sosAudio.currentTime = 0;
+      }).catch(() => {});
+    } catch (e) {
+      console.error("Trigger error", e);
+    }
     
     navigateTo("sos-activation");
   };
-
   const toggleShake = async (val: boolean) => {
     setShakeEnabled(val);
     if (typeof window !== 'undefined') {
