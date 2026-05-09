@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -24,6 +23,7 @@ interface VoiceCommandProps {
   t: any;
 }
 
+// 🔥 YAHAN MAINEY AAPKE SAARE NAYE SENTENCES ADD KAR DIYE HAIN (Bina dot ke taaki voice perfect catch kare)
 const EMERGENCY_KEYWORDS = [
   "help", 
   "help me", 
@@ -32,7 +32,18 @@ const EMERGENCY_KEYWORDS = [
   "bachao", 
   "emergency", 
   "police", 
-  "accident"
+  "accident",
+  // Campus & Student Emergency Sentences:
+  "i need medical help",
+  "i am unable to move",
+  "i am lost and need assistance",
+  "i am in an unsafe situation",
+  "i need help reaching my classroom",
+  "i need hostel or campus support",
+  "i cannot speak right now",
+  "please check my location",
+  "i need wheelchair assistance",
+  "i need help during an exam or campus event"
 ];
 
 export default function VoiceCommand({ navigateTo, onSOSTriggered, t }: VoiceCommandProps) {
