@@ -52,6 +52,12 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   const { data: profile } = useDoc(userRef);
   const { data: settings } = useDoc(settingsRef);
 
+  // 🔥 SCREEN LOCK EFFECT (JS Level Horizontal Block)
+  useEffect(() => {
+    document.body.style.overflowX = 'hidden';
+    document.documentElement.style.overflowX = 'hidden';
+  }, []);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const cachedContact = localStorage.getItem('safehelp_fast_contact');
@@ -108,7 +114,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     });
   };
 
-  // 🔥 THE "GOD MODE" CALL FIRE (3 Tareeko se ek sath attack karega)
   const handleQuickCall = () => {
     let phoneToCall = "+919586875178"; 
     if (fastContact && fastContact.phone) phoneToCall = fastContact.phone;
@@ -119,18 +124,15 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
 
     const cleanPhone = phoneToCall.replace(/\s+/g, '');
 
-    // ATTACK 1: App Bridge (App ko gupt message bhejega)
     if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
       (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "CALL", number: cleanPhone }));
     }
 
-    // ATTACK 2: Top Level Force Override (0.1 second baad)
     setTimeout(() => {
       if (window.top) window.top.location.href = `tel:${cleanPhone}`;
       else window.location.href = `tel:${cleanPhone}`;
     }, 100);
 
-    // ATTACK 3: Invisible Link Click (0.2 second baad)
     setTimeout(() => {
       const link = document.createElement('a');
       link.href = `tel:${cleanPhone}`;
@@ -141,7 +143,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     }, 200);
   };
 
- // 🔥 THE "GOD MODE" SMS FIRE (WITH SUPER-FAST LOCATION LINK)
   const handleQuickMessage = () => {
     let phoneToMessage = "+919586875178"; 
     if (fastContact && fastContact.phone) phoneToMessage = fastContact.phone;
@@ -153,23 +154,19 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     const cleanPhone = phoneToMessage.replace(/\s+/g, '');
     const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. Please respond ASAP. 🚨";
 
-    // SMS Bhejne ka Engine
     const fireSMS = (locationLink: string) => {
       const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}${locationLink}\n\n- Sent via SafeHelp App`;
       const encodedMsg = encodeURIComponent(msg);
 
-      // ATTACK 1: App Bridge
       if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
         (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "SMS", number: cleanPhone, text: msg }));
       }
 
-      // ATTACK 2: Top Level Force Override
       setTimeout(() => {
         if (window.top) window.top.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
         else window.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
       }, 100);
 
-      // ATTACK 3: Invisible Link Click
       setTimeout(() => {
         const link = document.createElement('a');
         link.href = `sms:${cleanPhone}?body=${encodedMsg}`;
@@ -180,7 +177,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
       }, 200);
     };
 
-    // Location Nikalne ka Fast Code (Sirf 3 second ka timeout)
     if ("geolocation" in navigator) {
       toast({ title: "Getting location..." });
       navigator.geolocation.getCurrentPosition(
@@ -190,9 +186,9 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
         },
         (err) => {
           console.log("Location Error: ", err);
-          fireSMS("\n\n📍 Location: GPS was slow/off. Track from app."); // Fail hone par bhi SMS rukega nahi
+          fireSMS("\n\n📍 Location: GPS was slow/off. Track from app."); 
         },
-        { enableHighAccuracy: true, timeout: 3000, maximumAge: 10000 } // 3 Second me timeout!
+        { enableHighAccuracy: true, timeout: 3000, maximumAge: 10000 } 
       );
     } else {
       fireSMS("");
@@ -254,7 +250,8 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   }, [shakeEnabled, shakeSensitivity, isSOSActive, navigateTo, t, toast]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-background relative overflow-y-auto">
+    // 🔥 YAHAN MAINEY overflow-x-hidden AUR w-full max-w-[100vw] LAGA DIYA HAI JO SCREEN KO LOCK KAR DEGA
+    <div className="flex flex-col min-h-screen bg-background relative overflow-x-hidden w-full max-w-[100vw]">
       {/* Header Area */}
       <div className="p-6 shrink-0 flex justify-between items-center w-full max-w-md mx-auto z-10">
         <div className="flex items-center space-x-2">
@@ -287,6 +284,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
             <AlertCircle className="w-16 h-16 text-white mb-2" />
             <span className="text-6xl font-headline font-bold text-white tracking-widest">SOS</span>
           </button>
+          {/* 🔥 DUSHMAN YAHAN THA (scale-125), AB MAIN WRAPPER NE ISKO KAAT DIYA HAI */}
           <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full scale-125 -z-0"></div>
         </div>
 
@@ -295,7 +293,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
           <Button onClick={() => navigateTo("voice-command")} className="w-full h-18 rounded-[1.5rem] bg-primary text-white text-lg font-bold glow-primary shadow-lg border-none active:scale-95 transition-all"><Mic className="w-6 h-6 mr-3" />{t.voiceCommand}</Button>
           
           <div className="grid grid-cols-2 gap-4">
-            {/* Wapas normal buttons jisme Click event kaam karega */}
             <Button onClick={handleQuickCall} variant="outline" className="h-20 rounded-[1.5rem] bg-secondary/30 flex flex-col items-center justify-center border-none active:scale-95 transition-all group">
               <Phone className="w-6 h-6 text-green-500 mb-1 group-active:scale-90" />
               <span className="text-[10px] font-bold uppercase tracking-tighter">{t.quickCall}</span>
