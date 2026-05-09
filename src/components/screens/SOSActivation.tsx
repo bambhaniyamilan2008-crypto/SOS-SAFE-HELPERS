@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { MapPin, X, Check, ShieldAlert } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface SOSActivationProps {
   onCancel: () => void;
@@ -18,64 +17,43 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   
   const hasSpokenRef = useRef(false);
   const isActionDoneRef = useRef(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null); 
+  const audioTagRef = useRef<HTMLAudioElement | null>(null);
 
-  // 🔥 GOD MODE VOICE: Direct Audio Object Bypass
   const speakSOS = () => {
     const API_KEY = "66def89da92b48fbbc5ee6b34eab3456"; 
+    const text = "SOS Activated";
+    const url = `https://api.voicerss.org/?key=${API_KEY}&hl=en-in&v=Jai&c=MP3&src=${encodeURIComponent(text)}`;
     
-    try {
-      // Direct URL injection for faster response
-      const audioUrl = `https://api.voicerss.org/?key=${API_KEY}&hl=en-in&v=Jai&c=MP3&src=SOS%20Activated`;
-      const audio = new Audio(audioUrl);
-      audio.volume = 1.0;
-      audioRef.current = audio;
-
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log("Autoplay blocked. User must touch screen.");
-          // Agar autoplay block hota hai toh silent fail hoga bina crash ke
-        });
-      }
-    } catch (error) {
-      console.error("Voice Error:", error);
+    if (audioTagRef.current) {
+      audioTagRef.current.src = url;
+      audioTagRef.current.volume = 1.0;
+      audioTagRef.current.play().catch((err) => {
+        console.log("Audio requires interaction.", err);
+      });
     }
   };
 
   useEffect(() => {
-    // 500ms ka delay taaki transitions smooth ho jaye aur browser ready ho
-    const audioTimer = setTimeout(() => {
+    const timer = setTimeout(() => {
       if (!hasSpokenRef.current) {
         speakSOS();
         hasSpokenRef.current = true;
       }
-    }, 500);
+    }, 600);
 
-    // Geolocation fix
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         () => setLocationStatus(t.locationAttached),
         () => setLocationStatus(t.gpsWeak),
-        { enableHighAccuracy: true, timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
       );
     }
 
-    const statusTimer = setTimeout(() => {
-      if (!isActionDoneRef.current) {
-        setMessageStatus(t.sendingSms);
-      }
-    }, 1500);
-
-    return () => {
-      clearTimeout(audioTimer);
-      clearTimeout(statusTimer);
-    };
-  }, [t]);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (isActionDoneRef.current) return;
-
     if (countdown > 0) {
       const timer = setTimeout(() => {
         if (!isActionDoneRef.current) setCountdown(countdown - 1);
@@ -87,27 +65,11 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     }
   }, [countdown, onActivated]);
 
-  const handleCancel = () => {
-    isActionDoneRef.current = true; 
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    onCancel();
-  };
-
-  const handleSendNow = () => {
-    isActionDoneRef.current = true; 
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    onActivated();
-  };
-
   return (
     <div className="flex flex-col min-h-screen p-8 justify-between items-center bg-black text-white relative">
+      <audio ref={audioTagRef} style={{ display: 'none' }} preload="auto" />
       <div className="absolute inset-0 bg-primary/10 animate-pulse pointer-events-none"></div>
-      <div className="absolute top-0 left-0 w-full h-1 bg-primary animate-blink"></div>
-
+      
       <div className="relative z-10 w-full text-center space-y-4 pt-12">
         <div className="flex justify-center mb-4">
           <div className="p-4 bg-primary rounded-full glow-primary animate-bounce">
@@ -141,21 +103,21 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       <div className="relative z-10 w-full grid grid-cols-2 gap-4 pb-12">
         <Button 
           variant="ghost" 
-          onClick={handleCancel} 
+          onClick={onCancel} 
           className="h-24 rounded-[2rem] border-2 border-white/20 text-white text-xl font-bold bg-white/5 hover:bg-white/10 active:scale-95 transition-all flex flex-col items-center justify-center"
         >
           <X className="w-8 h-8 mb-1" />
           <span>{t.cancel}</span>
         </Button>
         <Button 
-          onClick={handleSendNow} 
+          onClick={onActivated} 
           className="h-24 rounded-[2rem] bg-primary text-white text-xl font-bold glow-primary hover:bg-primary/90 active:scale-95 transition-all flex flex-col items-center justify-center"
         >
           <Check className="w-8 h-8 mb-1" />
           <span>{t.sendNow}</span>
         </Button>
       </div>
-
+      
       <style jsx global>{`
         @keyframes spin-slow {
           from { transform: rotate(0deg); }
