@@ -20,42 +20,36 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   const isActionDoneRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null); 
 
-  // 🔥 PERFECT VOICE ENGINE: Sirf "SOS Activated" bolega
-  const speakSOS = async () => {
-    // Aapki Working API Key
+  // 🔥 GOD MODE VOICE: Direct Audio Object Bypass
+  const speakSOS = () => {
     const API_KEY = "66def89da92b48fbbc5ee6b34eab3456"; 
-
-    // Validation: Agar key khali hai toh ruk jao
-    if (!API_KEY || API_KEY.length < 10) return;
-
+    
     try {
-      if (audioRef.current) {
-        audioRef.current.pause(); 
-      }
-
-      // VoiceRSS URL - Language: English India, Voice: Jai (Clear Male)
-      const text = "SOS Activated";
-      const url = `https://api.voicerss.org/?key=${API_KEY}&hl=en-in&v=Jai&c=MP3&src=${encodeURIComponent(text)}`;
-      
-      const audio = new Audio(url);
+      // Direct URL injection for faster response
+      const audioUrl = `https://api.voicerss.org/?key=${API_KEY}&hl=en-in&v=Jai&c=MP3&src=SOS%20Activated`;
+      const audio = new Audio(audioUrl);
+      audio.volume = 1.0;
       audioRef.current = audio;
 
-      // Play audio with error handling
-      await audio.play().catch((err) => {
-        console.log("Audio Playback Blocked: Tap screen to enable sound.");
-      });
-      
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.log("Autoplay blocked. User must touch screen.");
+        });
+      }
     } catch (error) {
       console.error("Voice Error:", error);
     }
   };
 
   useEffect(() => {
-    // Screen load hote hi awaaz nikalega
-    if (!hasSpokenRef.current) {
-      speakSOS();
-      hasSpokenRef.current = true;
-    }
+    // 500ms ka delay taaki transitions smooth ho jaye
+    const audioTimer = setTimeout(() => {
+      if (!hasSpokenRef.current) {
+        speakSOS();
+        hasSpokenRef.current = true;
+      }
+    }, 500);
 
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -65,13 +59,16 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       );
     }
 
-    const messageTimer = setTimeout(() => {
+    const statusTimer = setTimeout(() => {
       if (!isActionDoneRef.current) {
         setMessageStatus(t.sendingSms);
       }
     }, 1500);
 
-    return () => clearTimeout(messageTimer);
+    return () => {
+      clearTimeout(audioTimer);
+      clearTimeout(statusTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -84,25 +81,19 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       return () => clearTimeout(timer);
     } else {
       isActionDoneRef.current = true;
-      // Timer khatam hone par live tracking ka message (optional)
-      // speakSOS(); // Agar yahan bhi awaaz chahiye toh chalu rakhein
       onActivated();
     }
   }, [countdown, onActivated]);
 
   const handleCancel = () => {
     isActionDoneRef.current = true; 
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+    if (audioRef.current) audioRef.current.pause();
     onCancel();
   };
 
   const handleSendNow = () => {
     isActionDoneRef.current = true; 
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+    if (audioRef.current) audioRef.current.pause();
     onActivated();
   };
 

@@ -52,7 +52,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   const { data: profile } = useDoc(userRef);
   const { data: settings } = useDoc(settingsRef);
 
-  // 🔥 SCREEN LOCK EFFECT (JS Level Horizontal Block)
+  // 🔥 SCREEN LOCK EFFECT
   useEffect(() => {
     document.body.style.overflowX = 'hidden';
     document.documentElement.style.overflowX = 'hidden';
@@ -95,6 +95,19 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
       }
     }
   }, [settings]);
+
+  // 🔥 AUDIO PERMISSION BYPASS: SOS Click trigger
+  const handleSOSClick = () => {
+    // Silent trigger taaki browser audio permission unlock ho jaye
+    try {
+      const API_KEY = "66def89da92b48fbbc5ee6b34eab3456";
+      const audio = new Audio(`https://api.voicerss.org/?key=${API_KEY}&src=ready`);
+      audio.volume = 0;
+      audio.play().catch(() => {});
+    } catch (e) {}
+    
+    navigateTo("sos-activation");
+  };
 
   const toggleShake = async (val: boolean) => {
     setShakeEnabled(val);
@@ -177,7 +190,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
       }, 200);
     };
 
-    // 🔥 HIGH-PRECISION LOCATION LOCK UPDATE
     if ("geolocation" in navigator) {
       toast({ title: "Locking precise GPS location..." });
       navigator.geolocation.getCurrentPosition(
@@ -189,8 +201,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
           console.log("Location Error: ", err);
           fireSMS("\n\n📍 Location: GPS was slow/off. Track from app."); 
         },
-        // maximumAge: 0 = Pure Fresh Satellite Data
-        // timeout: 10000 = 10 second waiting time for perfect lock
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } 
       );
     } else {
@@ -253,9 +263,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   }, [shakeEnabled, shakeSensitivity, isSOSActive, navigateTo, t, toast]);
 
   return (
-    // 🔥 SCREEN LOCK
     <div className="flex flex-col min-h-screen bg-background relative overflow-x-hidden w-full max-w-[100vw]">
-      {/* Header Area */}
       <div className="p-6 shrink-0 flex justify-between items-center w-full max-w-md mx-auto z-10">
         <div className="flex items-center space-x-2">
           <Button variant="ghost" size="icon" onClick={() => navigateTo("profile")} className="rounded-full bg-secondary w-12 h-12 border border-border/50"><User className="w-6 h-6" /></Button>
@@ -272,25 +280,24 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
         <Button variant="ghost" size="icon" onClick={() => navigateTo("settings")} className="rounded-full bg-secondary w-12 h-12"><Settings className="w-6 h-6" /></Button>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col items-center px-6 pb-12 w-full max-w-md mx-auto space-y-10">
-        
-        {/* Welcome Text */}
         <div className="text-center space-y-1 mt-4">
           <h1 className="text-3xl font-headline font-bold">{t.hello}, {userName}</h1>
           <p className="text-muted-foreground font-medium text-sm">{t.tapEmergency}</p>
         </div>
 
-        {/* SOS Button */}
         <div className="relative flex items-center justify-center w-full">
-          <button onClick={() => navigateTo("sos-activation")} className={cn("w-64 h-64 rounded-full sos-gradient flex flex-col items-center justify-center transition-all duration-300 active:scale-95 shadow-2xl relative z-10", isSOSActive ? 'animate-blink' : 'pulse-primary')}>
+          {/* 🔥 MODIFIED SOS BUTTON WITH TRIGGER */}
+          <button 
+            onClick={handleSOSClick} 
+            className={cn("w-64 h-64 rounded-full sos-gradient flex flex-col items-center justify-center transition-all duration-300 active:scale-95 shadow-2xl relative z-10", isSOSActive ? 'animate-blink' : 'pulse-primary')}
+          >
             <AlertCircle className="w-16 h-16 text-white mb-2" />
             <span className="text-6xl font-headline font-bold text-white tracking-widest">SOS</span>
           </button>
           <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full scale-125 -z-0"></div>
         </div>
 
-        {/* Primary Emergency Actions */}
         <div className="grid grid-cols-1 w-full gap-4 max-w-sm">
           <Button onClick={() => navigateTo("voice-command")} className="w-full h-18 rounded-[1.5rem] bg-primary text-white text-lg font-bold glow-primary shadow-lg border-none active:scale-95 transition-all"><Mic className="w-6 h-6 mr-3" />{t.voiceCommand}</Button>
           
@@ -306,7 +313,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
           </div>
         </div>
 
-        {/* Secondary Actions & Info */}
         <div className="w-full space-y-4 max-w-sm pt-4">
           <button onClick={() => navigateTo("contacts")} className="w-full h-20 bg-accent rounded-[1.5rem] flex items-center justify-between px-6 shadow-lg active:scale-95 transition-all">
             <div className="flex items-center space-x-4 text-white">
@@ -317,7 +323,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
           </button>
         </div>
 
-        {/* Advanced Shake SOS Toggle */}
         <div className="w-full flex flex-col items-center space-y-3 pt-6 pb-4">
           <button onClick={() => toggleShake(!shakeEnabled)} className={cn("w-full max-w-sm h-20 rounded-[1.5rem] flex items-center justify-center space-x-4 transition-all duration-300 active:scale-95 shadow-lg border-2", shakeEnabled ? "bg-gradient-to-br from-yellow-400 to-orange-500 border-yellow-200/50" : "bg-secondary/40 border-border/50")}>
             <Zap className={cn("w-6 h-6", shakeEnabled ? "text-white" : "text-muted-foreground")} />
@@ -331,7 +336,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
             <span className={cn("text-[9px] font-bold uppercase tracking-tighter", shakeEnabled ? "text-green-500" : "text-muted-foreground")}>{t.status}: {shakeEnabled ? t.enabled : t.disabled}</span>
           </div>
         </div>
-
       </div>
     </div>
   );
