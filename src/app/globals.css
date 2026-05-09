@@ -124,3 +124,19 @@
 .leaflet-bar {
   border: none !important;
 }
+
+/* 🔥 BLOCK LEFT/RIGHT SCROLL FOREVER (God Mode Lock) */
+html, body {
+  overflow-x: hidden !important;
+  overscroll-behavior-x: none !important;
+  touch-action: pan-y !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  position: relative;
+}
+
+/* Ensure no inner element causes horizontal stretch */
+* {
+  max-width: 100vw !important;
+  box-sizing: border-box !important;
+}
