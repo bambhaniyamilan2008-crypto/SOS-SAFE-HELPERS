@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { MapPin, X, Check, ShieldAlert } from "lucide-react";
 
-// 🔥 Firebase update
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 
@@ -18,8 +17,11 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   const [countdown, setCountdown] = useState(3);
   const [locationStatus, setLocationStatus] = useState(t.fetchingLocation);
   const [messageStatus, setMessageStatus] = useState(t.preparingAlert);
+  
   const [currentAlertId, setCurrentAlertId] = useState<string | null>(null);
   
+  // 🔥 Ye Ref ID ko turant yaad rakhega (bina state delay ke)
+  const alertIdRef = useRef<string | null>(null);
   const hasSpokenRef = useRef(false);
   const isActionDoneRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null); 
@@ -35,53 +37,65 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     } catch (error) { console.error("Voice Error:", error); }
   };
 
-  // 🚀 HIGH-ACCURACY ALERT FUNCTION
+  // 🚀 INSTANT ALERT FUNCTION (Location background mein update hogi)
   const fireDashboardAlert = async () => {
-    // Navigator se current location fetch karo
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const docRef = await addDoc(collection(db, "alerts"), {
-            userName: "Milan", // Aapka profile name
-            userId: "milan_2103_8", 
-            phone: "+91 91041XXXXX", // Apna real number yahan likhein
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-            status: "active",
-            timestamp: serverTimestamp(),
-            type: "Panic Button"
-          });
+    try {
+      // 1. Turant Alert Bhejo (Bina GPS wait kiye) taaki ID mil jaye
+      const docRef = await addDoc(collection(db, "alerts"), {
+        userName: "Milan",
+        userId: "milan_2103_8", 
+        phone: "+91 91041XXXXX", // Apna number daalein
+        status: "active",
+        timestamp: serverTimestamp(),
+        type: "Panic Button",
+        lat: null, // Shuru mein null rahega
+        lng: null
+      });
+      
+      // ID turant save kar lo
+      setCurrentAlertId(docRef.id);
+      alertIdRef.current = docRef.id;
+      console.log("🚨 Instant Alert Sent! ID:", docRef.id);
+
+      // 2. Ab aaram se Location fetch karo aur update karo
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setLocationStatus(t.locationAttached || "Location Found");
           
-          setCurrentAlertId(docRef.id);
-          console.log("🚨 High-Accuracy Alert Sent! ID:", docRef.id);
-        } catch (e) { 
-          console.error("Firebase Error: ", e); 
-        }
-      },
-      (err) => {
-        console.error("GPS Error:", err);
-        // Fallback agar GPS fail ho jaye
-        addDoc(collection(db, "alerts"), {
-          userName: "Milan",
-          status: "active",
-          timestamp: serverTimestamp(),
-          type: "Panic Button (No GPS)"
-        }).then(docRef => setCurrentAlertId(docRef.id));
-      },
-      { enableHighAccuracy: true, timeout: 5000 }
-    );
+          // 🔥 GPS milne par usi ID mein location daal do
+          if (alertIdRef.current) {
+            await updateDoc(doc(db, "alerts", alertIdRef.current), { lat, lng });
+            console.log("📍 Location updated in Database!");
+          }
+        },
+        (err) => console.error("GPS Error:", err),
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+
+    } catch (e) { 
+      console.error("Firebase Error: ", e); 
+    }
   };
 
-  // 🚀 RESOLVE FUNCTION
+  // 🚀 BULLETPROOF RESOLVE FUNCTION
   const resolveSOS = async () => {
-    if (!currentAlertId) return;
+    // Ref ya State dono mein se jo pehle mil jaye
+    const activeId = currentAlertId || alertIdRef.current; 
+    
+    if (!activeId) {
+      console.log("No active alert to resolve.");
+      return;
+    }
+
     try {
-      const alertRef = doc(db, "alerts", currentAlertId);
+      const alertRef = doc(db, "alerts", activeId);
       await updateDoc(alertRef, {
         status: "resolved",
         resolvedAt: serverTimestamp()
       });
-      console.log("✅ Dashboard updated: Situation Secured");
+      console.log("✅ DASHBOARD UPDATED: Situation Secured");
     } catch (e) {
       console.error("Resolve Error:", e);
     }
@@ -107,7 +121,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     } else {
       isActionDoneRef.current = true;
       fireDashboardAlert();
-      onActivated();
+      onActivated(); // Agar ye doosri screen par bhejta hai toh theek hai
     }
   }, [countdown, onActivated]);
 
@@ -115,9 +129,9 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     isActionDoneRef.current = true; 
     if (audioRef.current) audioRef.current.pause();
     
-    if (currentAlertId) {
-      await resolveSOS();
-    }
+    // 🔥 Resolved mark karo uske baad cancel karo
+    await resolveSOS();
+    
     onCancel();
   };
 
@@ -166,7 +180,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
           className="h-24 rounded-[2rem] border-2 border-white/20 text-white text-xl font-black bg-white/5 hover:bg-red-600/20 active:scale-95 transition-all flex flex-col"
         >
           <X className="w-8 h-8 mb-1" />
-          <span className="text-xs uppercase">{currentAlertId ? "I AM SAFE" : t.cancel}</span>
+          <span className="text-xs uppercase">{(currentAlertId || alertIdRef.current) ? "I AM SAFE" : t.cancel}</span>
         </Button>
         <Button 
           onClick={handleSendNow} 
