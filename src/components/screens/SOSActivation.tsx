@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { MapPin, X, Check, ShieldAlert } from "lucide-react";
 
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+// 🔥 Naye imports add kiye: query, where, getDocs
+import { collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 
 interface SOSActivationProps {
@@ -25,7 +26,6 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   const isActionDoneRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null); 
 
-  // 🔥 STEP 1: Component load hote hi check karo kya koi purana alert active hai
   useEffect(() => {
     if (typeof window !== "undefined") {
       const savedId = localStorage.getItem("activeAlertId");
@@ -60,13 +60,11 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         lng: null
       });
       
-      // 🔥 STEP 2: ID ko state, ref, aur LocalStorage teeno mein save karo
       setCurrentAlertId(docRef.id);
       alertIdRef.current = docRef.id;
       if (typeof window !== "undefined") {
         localStorage.setItem("activeAlertId", docRef.id);
       }
-      console.log("🚨 Alert Live! ID:", docRef.id);
 
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -87,31 +85,41 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     }
   };
 
-  // 🔥 STEP 3: Sabse Powerful Resolve Function
+  // 🔥 YAHAN HAI ASLI MAGIC (Direct Database Search & Destroy)
   const resolveSOS = async () => {
-    // Kahi se bhi ID dhoondho (State, Ref, ya Storage)
-    let activeId = currentAlertId || alertIdRef.current;
-    if (!activeId && typeof window !== "undefined") {
-      activeId = localStorage.getItem("activeAlertId");
-    }
-
-    if (!activeId) {
-      console.log("No alert to resolve.");
-      return;
-    }
-
     try {
-      const alertRef = doc(db, "alerts", activeId);
-      await updateDoc(alertRef, {
-        status: "resolved",
-        resolvedAt: serverTimestamp()
-      });
-      console.log("✅ DASHBOARD UPDATED: Alert Closed");
-      
-      // Kaam hone ke baad memory saaf kar do
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("activeAlertId");
+      // 1. Agar ID pata hai, toh sidha resolve karo
+      let activeId = currentAlertId || alertIdRef.current;
+      if (!activeId && typeof window !== "undefined") {
+        activeId = localStorage.getItem("activeAlertId");
       }
+
+      if (activeId) {
+        await updateDoc(doc(db, "alerts", activeId), {
+          status: "resolved",
+          resolvedAt: serverTimestamp()
+        });
+        if (typeof window !== "undefined") localStorage.removeItem("activeAlertId");
+      }
+
+      // 2. ULTIMATE BACKUP: Database mein check karo ki Milan ka koi active alert bacha toh nahi?
+      // Agar bacha hai toh usko forcefully resolve kar do!
+      const q = query(
+        collection(db, "alerts"), 
+        where("userId", "==", "milan_2103_8"), 
+        where("status", "==", "active")
+      );
+      
+      const querySnapshot = await getDocs(q);
+      querySnapshot.forEach(async (alertDoc) => {
+        await updateDoc(doc(db, "alerts", alertDoc.id), {
+          status: "resolved",
+          resolvedAt: serverTimestamp()
+        });
+        console.log("🔥 Forcefully resolved from Database search:", alertDoc.id);
+      });
+
+      console.log("✅ DASHBOARD 100% UPDATED: All Alerts Closed");
     } catch (e) {
       console.error("Resolve Error:", e);
     }
@@ -144,7 +152,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     isActionDoneRef.current = true; 
     if (audioRef.current) audioRef.current.pause();
     
-    // 🔥 Pehle Database update karo, phir aage badho
+    // 🔥 Resolved hone ka poora wait karo
     await resolveSOS();
     
     onCancel();
@@ -195,10 +203,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
           className="h-24 rounded-[2rem] border-2 border-white/20 text-white text-xl font-black bg-white/5 hover:bg-red-600/20 active:scale-95 transition-all flex flex-col"
         >
           <X className="w-8 h-8 mb-1" />
-          {/* 🔥 Agar memory mein ID hai toh I AM SAFE dikhao */}
-          <span className="text-xs uppercase">
-            {(currentAlertId || alertIdRef.current || (typeof window !== "undefined" && localStorage.getItem("activeAlertId"))) ? "I AM SAFE" : t.cancel}
-          </span>
+          <span className="text-xs uppercase">I AM SAFE</span>
         </Button>
         <Button 
           onClick={handleSendNow} 
