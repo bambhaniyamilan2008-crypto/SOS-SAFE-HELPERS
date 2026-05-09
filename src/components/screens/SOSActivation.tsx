@@ -19,12 +19,22 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   const [messageStatus, setMessageStatus] = useState(t.preparingAlert);
   
   const [currentAlertId, setCurrentAlertId] = useState<string | null>(null);
-  
-  // 🔥 Ye Ref ID ko turant yaad rakhega (bina state delay ke)
   const alertIdRef = useRef<string | null>(null);
+  
   const hasSpokenRef = useRef(false);
   const isActionDoneRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null); 
+
+  // 🔥 STEP 1: Component load hote hi check karo kya koi purana alert active hai
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedId = localStorage.getItem("activeAlertId");
+      if (savedId) {
+        setCurrentAlertId(savedId);
+        alertIdRef.current = savedId;
+      }
+    }
+  }, []);
 
   const speakSOS = () => {
     const API_KEY = "66def89da92b48fbbc5ee6b34eab3456"; 
@@ -37,55 +47,56 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     } catch (error) { console.error("Voice Error:", error); }
   };
 
-  // 🚀 INSTANT ALERT FUNCTION (Location background mein update hogi)
   const fireDashboardAlert = async () => {
     try {
-      // 1. Turant Alert Bhejo (Bina GPS wait kiye) taaki ID mil jaye
       const docRef = await addDoc(collection(db, "alerts"), {
         userName: "Milan",
         userId: "milan_2103_8", 
-        phone: "+91 91041XXXXX", // Apna number daalein
+        phone: "+91 91041XXXXX", 
         status: "active",
         timestamp: serverTimestamp(),
         type: "Panic Button",
-        lat: null, // Shuru mein null rahega
+        lat: null, 
         lng: null
       });
       
-      // ID turant save kar lo
+      // 🔥 STEP 2: ID ko state, ref, aur LocalStorage teeno mein save karo
       setCurrentAlertId(docRef.id);
       alertIdRef.current = docRef.id;
-      console.log("🚨 Instant Alert Sent! ID:", docRef.id);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("activeAlertId", docRef.id);
+      }
+      console.log("🚨 Alert Live! ID:", docRef.id);
 
-      // 2. Ab aaram se Location fetch karo aur update karo
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
-          setLocationStatus(t.locationAttached || "Location Found");
+          setLocationStatus(t.locationAttached || "Location Attached");
           
-          // 🔥 GPS milne par usi ID mein location daal do
-          if (alertIdRef.current) {
-            await updateDoc(doc(db, "alerts", alertIdRef.current), { lat, lng });
-            console.log("📍 Location updated in Database!");
+          const activeId = alertIdRef.current || (typeof window !== "undefined" ? localStorage.getItem("activeAlertId") : null);
+          if (activeId) {
+            await updateDoc(doc(db, "alerts", activeId), { lat, lng });
           }
         },
         (err) => console.error("GPS Error:", err),
         { enableHighAccuracy: true, timeout: 5000 }
       );
-
     } catch (e) { 
       console.error("Firebase Error: ", e); 
     }
   };
 
-  // 🚀 BULLETPROOF RESOLVE FUNCTION
+  // 🔥 STEP 3: Sabse Powerful Resolve Function
   const resolveSOS = async () => {
-    // Ref ya State dono mein se jo pehle mil jaye
-    const activeId = currentAlertId || alertIdRef.current; 
-    
+    // Kahi se bhi ID dhoondho (State, Ref, ya Storage)
+    let activeId = currentAlertId || alertIdRef.current;
+    if (!activeId && typeof window !== "undefined") {
+      activeId = localStorage.getItem("activeAlertId");
+    }
+
     if (!activeId) {
-      console.log("No active alert to resolve.");
+      console.log("No alert to resolve.");
       return;
     }
 
@@ -95,7 +106,12 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         status: "resolved",
         resolvedAt: serverTimestamp()
       });
-      console.log("✅ DASHBOARD UPDATED: Situation Secured");
+      console.log("✅ DASHBOARD UPDATED: Alert Closed");
+      
+      // Kaam hone ke baad memory saaf kar do
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("activeAlertId");
+      }
     } catch (e) {
       console.error("Resolve Error:", e);
     }
@@ -108,7 +124,6 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         hasSpokenRef.current = true;
       }
     }, 500);
-
     return () => clearTimeout(audioTimer);
   }, []);
 
@@ -121,7 +136,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     } else {
       isActionDoneRef.current = true;
       fireDashboardAlert();
-      onActivated(); // Agar ye doosri screen par bhejta hai toh theek hai
+      onActivated();
     }
   }, [countdown, onActivated]);
 
@@ -129,7 +144,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     isActionDoneRef.current = true; 
     if (audioRef.current) audioRef.current.pause();
     
-    // 🔥 Resolved mark karo uske baad cancel karo
+    // 🔥 Pehle Database update karo, phir aage badho
     await resolveSOS();
     
     onCancel();
@@ -180,7 +195,10 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
           className="h-24 rounded-[2rem] border-2 border-white/20 text-white text-xl font-black bg-white/5 hover:bg-red-600/20 active:scale-95 transition-all flex flex-col"
         >
           <X className="w-8 h-8 mb-1" />
-          <span className="text-xs uppercase">{(currentAlertId || alertIdRef.current) ? "I AM SAFE" : t.cancel}</span>
+          {/* 🔥 Agar memory mein ID hai toh I AM SAFE dikhao */}
+          <span className="text-xs uppercase">
+            {(currentAlertId || alertIdRef.current || (typeof window !== "undefined" && localStorage.getItem("activeAlertId"))) ? "I AM SAFE" : t.cancel}
+          </span>
         </Button>
         <Button 
           onClick={handleSendNow} 
