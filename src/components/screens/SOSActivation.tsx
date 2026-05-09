@@ -18,43 +18,42 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   
   const hasSpokenRef = useRef(false);
   const isActionDoneRef = useRef(false);
-  
-  // 🔥 API WALI AUDIO KO CONTROL KARNE KA REF
   const audioRef = useRef<HTMLAudioElement | null>(null); 
 
-  // 🔥 NAYA API-BASED VOICE ENGINE (Limit aane par chup ho jayega)
-  const speak = async (text: string) => {
-    // 👉 STEP 1: YAHAN APNI API KEY DALO
+  // 🔥 PERFECT VOICE ENGINE: Sirf "SOS Activated" bolega
+  const speakSOS = async () => {
+    // Aapki Working API Key
     const API_KEY = "66def89da92b48fbbc5ee6b34eab3456"; 
 
-    // Jab tak aap key nahi daloge, system chup rahega
-    if (API_KEY === "66def89da92b48fbbc5ee6b34eab3456") return;
+    // Validation: Agar key khali hai toh ruk jao
+    if (!API_KEY || API_KEY.length < 10) return;
 
     try {
       if (audioRef.current) {
-        audioRef.current.pause(); // Agar purani awaaz chal rahi hai toh rok do
+        audioRef.current.pause(); 
       }
 
-      // VoiceRSS API URL (Indian English 'Jai' ki clear awaaz ke sath)
+      // VoiceRSS URL - Language: English India, Voice: Jai (Clear Male)
+      const text = "SOS Activated";
       const url = `https://api.voicerss.org/?key=${API_KEY}&hl=en-in&v=Jai&c=MP3&src=${encodeURIComponent(text)}`;
+      
       const audio = new Audio(url);
       audioRef.current = audio;
 
-      // Agar limit (quota) khatam ho gayi, ya network issue aaya
-      // toh API MP3 file nahi degi, aur audio object fail ho jayega.
-      // Yeh `.catch()` usko chupchap ignore kar dega (Chup ho jayega!)
-      await audio.play().catch(() => {
-        console.log("API Limit Reached or Blocked. System is staying silent.");
+      // Play audio with error handling
+      await audio.play().catch((err) => {
+        console.log("Audio Playback Blocked: Tap screen to enable sound.");
       });
       
     } catch (error) {
-      // Kisi bhi error par koi awaz nahi, app smooth chalti rahegi
+      console.error("Voice Error:", error);
     }
   };
 
   useEffect(() => {
+    // Screen load hote hi awaaz nikalega
     if (!hasSpokenRef.current) {
-      speak(`${t.sosActivated}. Alerts will be sent in 3 seconds.`);
+      speakSOS();
       hasSpokenRef.current = true;
     }
 
@@ -73,7 +72,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     }, 1500);
 
     return () => clearTimeout(messageTimer);
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     if (isActionDoneRef.current) return;
@@ -85,27 +84,25 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       return () => clearTimeout(timer);
     } else {
       isActionDoneRef.current = true;
-      speak("Emergency alerts sent. Tracking is live.");
+      // Timer khatam hone par live tracking ka message (optional)
+      // speakSOS(); // Agar yahan bhi awaaz chahiye toh chalu rakhein
       onActivated();
     }
   }, [countdown, onActivated]);
 
-  // 🔥 SAFE CANCEL BUTTON
   const handleCancel = () => {
     isActionDoneRef.current = true; 
     if (audioRef.current) {
-      audioRef.current.pause(); // API wali awaaz turant rok dega
+      audioRef.current.pause();
     }
     onCancel();
   };
 
-  // 🔥 SAFE SEND BUTTON
   const handleSendNow = () => {
     isActionDoneRef.current = true; 
     if (audioRef.current) {
       audioRef.current.pause();
     }
-    speak("Emergency alerts sent. Tracking is live.");
     onActivated();
   };
 
