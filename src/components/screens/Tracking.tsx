@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
@@ -39,6 +38,9 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
   const [heading, setHeading] = useState<number>(0);
   const [isMounted, setIsMounted] = useState(false);
   const [leafletLoaded, setLeafletLoaded] = useState(false);
+  
+  // 🔥 GOD MODE: Fast Cache State
+  const [fastContact, setFastContact] = useState<any>(null);
 
   const LRef = useRef<any>(null);
   const MapContainerRef = useRef<any>(null);
@@ -46,7 +48,6 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
   const MarkerRef = useRef<any>(null);
   const mapInstanceRef = useRef<any>(null);
 
-  // 🔹 Fetch user profile and settings
   const userRef = useMemo(() => {
     if (!user || !db) return null;
     return doc(db, "users", user.uid);
@@ -60,9 +61,25 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
   const { data: profile } = useDoc(userRef);
   const { data: settings } = useDoc(settingsRef);
 
-  const primaryContact = useMemo(() => {
-    if (!profile?.contacts) return null;
-    return profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
+  // 🔥 FAST CACHE ENGINE: Get Contact Instantly from Memory
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const cachedContact = localStorage.getItem('safehelp_fast_contact');
+      if (cachedContact) {
+        try { setFastContact(JSON.parse(cachedContact)); } catch (e) {}
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (profile && profile.contacts && profile.contacts.length > 0) {
+      const starred = profile.contacts.find((c: any) => c.isPrimary);
+      const contactToSave = starred || profile.contacts[0];
+      setFastContact(contactToSave); 
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('safehelp_fast_contact', JSON.stringify(contactToSave));
+      }
+    }
   }, [profile]);
 
   useEffect(() => {
@@ -116,41 +133,70 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     }
   };
 
+  // 🔥 GOD MODE: TRIPLE ATTACK SMS (No Blocking)
   const handleMessageClick = () => {
-    if (!primaryContact) {
-      toast({ 
-        variant: "destructive", 
-        title: "No contact found", 
-        description: "Please add an emergency contact in settings first." 
-      });
-      return;
-    }
+    let phoneToMessage = "+919586875178"; 
+    if (fastContact && fastContact.phone) phoneToMessage = fastContact.phone;
+    else if (profile && profile.contacts && profile.contacts.length > 0) {
+      const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
+      phoneToMessage = starred.phone;
+    } 
 
+    const cleanPhone = phoneToMessage.replace(/\s+/g, '');
+    const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. My live location is attached below. Please respond ASAP. 🚨";
     const lat = coords[0];
     const lng = coords[1];
-    const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. My live location is attached below. Please respond ASAP. 🚨";
     
-    const messageBody = `🚨 EMERGENCY ALERT 🚨
+    const messageBody = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}\n\n📍 Live Tracking: https://maps.google.com/?q=${lat},${lng}\n\n- Sent via SafeHelp App`;
+    const encodedMsg = encodeURIComponent(messageBody);
 
-${customMessage}
+    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "SMS", number: cleanPhone, text: messageBody }));
+    }
 
-📍 https://maps.google.com/?q=${lat},${lng}
+    setTimeout(() => {
+      if (window.top) window.top.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
+      else window.location.href = `sms:${cleanPhone}?body=${encodedMsg}`;
+    }, 100);
 
-- Sent via SafeHelp App`;
-
-    window.location.href = `sms:${primaryContact.phone}?body=${encodeURIComponent(messageBody)}`;
+    setTimeout(() => {
+      const link = document.createElement('a');
+      link.href = `sms:${cleanPhone}?body=${encodedMsg}`;
+      link.target = '_top';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }, 200);
   };
 
+  // 🔥 GOD MODE: TRIPLE ATTACK CALL (No Blocking)
   const handleCallSupport = () => {
-    if (primaryContact && primaryContact.phone) {
-      window.location.href = `tel:${primaryContact.phone}`;
-    } else {
-      toast({
-        variant: "destructive",
-        title: "No emergency contact selected",
-        description: "Please designate a primary contact in your safety profile.",
-      });
+    let phoneToCall = "+919586875178"; 
+    if (fastContact && fastContact.phone) phoneToCall = fastContact.phone;
+    else if (profile && profile.contacts && profile.contacts.length > 0) {
+      const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
+      phoneToCall = starred.phone;
+    } 
+
+    const cleanPhone = phoneToCall.replace(/\s+/g, '');
+
+    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
+      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "CALL", number: cleanPhone }));
     }
+
+    setTimeout(() => {
+      if (window.top) window.top.location.href = `tel:${cleanPhone}`;
+      else window.location.href = `tel:${cleanPhone}`;
+    }, 100);
+
+    setTimeout(() => {
+      const link = document.createElement('a');
+      link.href = `tel:${cleanPhone}`;
+      link.target = '_top';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }, 200);
   };
 
   const customMarkerIcon = useMemo(() => {
