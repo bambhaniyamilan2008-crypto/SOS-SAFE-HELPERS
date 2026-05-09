@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { MapPin, X, Check, ShieldAlert } from "lucide-react";
 
-// 🔥 Naye imports add kiye: query, where, getDocs
+// 🔥 FIREBASE IMPORTS (God Mode ke liye getDocs aur query add kiya hai)
 import { collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 
@@ -19,22 +19,10 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   const [locationStatus, setLocationStatus] = useState(t.fetchingLocation);
   const [messageStatus, setMessageStatus] = useState(t.preparingAlert);
   
-  const [currentAlertId, setCurrentAlertId] = useState<string | null>(null);
-  const alertIdRef = useRef<string | null>(null);
-  
   const hasSpokenRef = useRef(false);
   const isActionDoneRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null); 
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedId = localStorage.getItem("activeAlertId");
-      if (savedId) {
-        setCurrentAlertId(savedId);
-        alertIdRef.current = savedId;
-      }
-    }
-  }, []);
+  const alertIdRef = useRef<string | null>(null);
 
   const speakSOS = () => {
     const API_KEY = "66def89da92b48fbbc5ee6b34eab3456"; 
@@ -47,8 +35,10 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     } catch (error) { console.error("Voice Error:", error); }
   };
 
+  // 🚀 ALERT SEND FUNCTION
   const fireDashboardAlert = async () => {
     try {
+      // 1. Bina GPS wait kiye turant alert bhejo
       const docRef = await addDoc(collection(db, "alerts"), {
         userName: "Milan",
         userId: "milan_2103_8", 
@@ -60,21 +50,18 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         lng: null
       });
       
-      setCurrentAlertId(docRef.id);
       alertIdRef.current = docRef.id;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("activeAlertId", docRef.id);
-      }
+      console.log("🚨 Alert Live! ID:", docRef.id);
 
+      // 2. Background mein GPS location update karo
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setLocationStatus(t.locationAttached || "Location Attached");
           
-          const activeId = alertIdRef.current || (typeof window !== "undefined" ? localStorage.getItem("activeAlertId") : null);
-          if (activeId) {
-            await updateDoc(doc(db, "alerts", activeId), { lat, lng });
+          if (alertIdRef.current) {
+            await updateDoc(doc(db, "alerts", alertIdRef.current), { lat, lng });
           }
         },
         (err) => console.error("GPS Error:", err),
@@ -85,44 +72,48 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     }
   };
 
-  // 🔥 YAHAN HAI ASLI MAGIC (Direct Database Search & Destroy)
-  const resolveSOS = async () => {
+  // 🔥 GOD MODE / NUCLEAR RESOLVE FUNCTION
+  const handleCancel = async () => {
+    isActionDoneRef.current = true; 
+    if (audioRef.current) audioRef.current.pause();
+    
     try {
-      // 1. Agar ID pata hai, toh sidha resolve karo
-      let activeId = currentAlertId || alertIdRef.current;
-      if (!activeId && typeof window !== "undefined") {
-        activeId = localStorage.getItem("activeAlertId");
-      }
-
-      if (activeId) {
-        await updateDoc(doc(db, "alerts", activeId), {
-          status: "resolved",
-          resolvedAt: serverTimestamp()
-        });
-        if (typeof window !== "undefined") localStorage.removeItem("activeAlertId");
-      }
-
-      // 2. ULTIMATE BACKUP: Database mein check karo ki Milan ka koi active alert bacha toh nahi?
-      // Agar bacha hai toh usko forcefully resolve kar do!
-      const q = query(
-        collection(db, "alerts"), 
-        where("userId", "==", "milan_2103_8"), 
-        where("status", "==", "active")
-      );
-      
+      // 1. Database se seedha saare 'active' alerts uthao
+      const q = query(collection(db, "alerts"), where("status", "==", "active"));
       const querySnapshot = await getDocs(q);
-      querySnapshot.forEach(async (alertDoc) => {
-        await updateDoc(doc(db, "alerts", alertDoc.id), {
-          status: "resolved",
-          resolvedAt: serverTimestamp()
-        });
-        console.log("🔥 Forcefully resolved from Database search:", alertDoc.id);
-      });
 
-      console.log("✅ DASHBOARD 100% UPDATED: All Alerts Closed");
-    } catch (e) {
-      console.error("Resolve Error:", e);
+      if (querySnapshot.empty) {
+        console.log("No active alerts found to resolve.");
+      } else {
+        // 2. Ek-ek karke sabko forcefully Resolved mark kar do
+        const updatePromises = querySnapshot.docs.map((alertDoc) => 
+          updateDoc(doc(db, "alerts", alertDoc.id), {
+            status: "resolved",
+            resolvedAt: serverTimestamp()
+          })
+        );
+        
+        await Promise.all(updatePromises);
+        
+        // 🔥 Screen par success ka message
+        alert("✅ SafeHelp: Dashboard Update Ho Gaya Hai! (Situation Secured)");
+      }
+    } catch (error: any) {
+      alert("❌ Firebase Error: " + error.message);
+      console.error(error);
     }
+
+    // 3. Update hone ke thodi der baad screen band karo
+    setTimeout(() => {
+      onCancel();
+    }, 500); 
+  };
+
+  const handleSendNow = () => {
+    isActionDoneRef.current = true; 
+    if (audioRef.current) audioRef.current.pause();
+    fireDashboardAlert();
+    onActivated();
   };
 
   useEffect(() => {
@@ -147,23 +138,6 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       onActivated();
     }
   }, [countdown, onActivated]);
-
-  const handleCancel = async () => {
-    isActionDoneRef.current = true; 
-    if (audioRef.current) audioRef.current.pause();
-    
-    // 🔥 Resolved hone ka poora wait karo
-    await resolveSOS();
-    
-    onCancel();
-  };
-
-  const handleSendNow = () => {
-    isActionDoneRef.current = true; 
-    if (audioRef.current) audioRef.current.pause();
-    fireDashboardAlert();
-    onActivated();
-  };
 
   return (
     <div className="flex flex-col min-h-screen p-8 justify-between items-center bg-black text-white relative">
