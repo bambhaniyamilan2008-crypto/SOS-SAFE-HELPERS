@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { MapPin, X, Check, ShieldAlert } from "lucide-react";
 
-// 🔥 FIREBASE IMPORTS (God Mode ke liye getDocs aur query add kiya hai)
+// 🔥 FIREBASE IMPORTS
 import { collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 
@@ -72,41 +72,50 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     }
   };
 
-  // 🔥 GOD MODE / NUCLEAR RESOLVE FUNCTION
+  // 🔥 UNBLOCKED RESOLVE FUNCTION (I AM SAFE Button)
   const handleCancel = async () => {
-    isActionDoneRef.current = true; 
     if (audioRef.current) audioRef.current.pause();
     
     try {
-      // 1. Database se seedha saare 'active' alerts uthao
+      console.log("🚨 I AM SAFE Button Pressed! Searching Firebase...");
+      
+      // 1. Database se active alert dhundho
       const q = query(collection(db, "alerts"), where("status", "==", "active"));
       const querySnapshot = await getDocs(q);
 
+      console.log("Active Alerts Found:", querySnapshot.size);
+
       if (querySnapshot.empty) {
-        console.log("No active alerts found to resolve.");
+        alert("⚠️ App ko Firebase mein koi 'active' alert nahi mila!");
       } else {
-        // 2. Ek-ek karke sabko forcefully Resolved mark kar do
-        const updatePromises = querySnapshot.docs.map((alertDoc) => 
-          updateDoc(doc(db, "alerts", alertDoc.id), {
+        // 2. Sabko zabardasti 'resolved' karo
+        const updatePromises = querySnapshot.docs.map((alertDoc) => {
+          const docReference = doc(db, "alerts", alertDoc.id);
+          return updateDoc(docReference, {
             status: "resolved",
             resolvedAt: serverTimestamp()
-          })
-        );
+          });
+        });
         
         await Promise.all(updatePromises);
+        console.log("✅ All alerts marked as resolved!");
         
-        // 🔥 Screen par success ka message
-        alert("✅ SafeHelp: Dashboard Update Ho Gaya Hai! (Situation Secured)");
+        // 🔥 Screen par success dikhao
+        alert("✅ Dashboard Green Ho Gaya Hoga! Firebase Updated.");
       }
     } catch (error: any) {
-      alert("❌ Firebase Error: " + error.message);
-      console.error(error);
+      console.error("🔥 UPDATE ERROR:", error);
+      alert("Error: " + error.message);
     }
 
-    // 3. Update hone ke thodi der baad screen band karo
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("activeAlertId");
+    }
+    
+    // 1 second ka wait taaki database 100% update ho jaye, phir screen band ho
     setTimeout(() => {
-      onCancel();
-    }, 500); 
+      onCancel(); 
+    }, 1000); 
   };
 
   const handleSendNow = () => {
