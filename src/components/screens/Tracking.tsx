@@ -39,7 +39,6 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [leafletLoaded, setLeafletLoaded] = useState(false);
   
-  // 🔥 GOD MODE: Fast Cache State
   const [fastContact, setFastContact] = useState<any>(null);
 
   const LRef = useRef<any>(null);
@@ -61,7 +60,6 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
   const { data: profile } = useDoc(userRef);
   const { data: settings } = useDoc(settingsRef);
 
-  // 🔥 FAST CACHE ENGINE: Get Contact Instantly from Memory
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const cachedContact = localStorage.getItem('safehelp_fast_contact');
@@ -101,6 +99,7 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
 
     let watchId: number;
     if ("geolocation" in navigator) {
+      // 🔥 FIX 1: Strict GPS Tracking for Real-time accuracy
       watchId = navigator.geolocation.watchPosition(
         (position) => {
           const newCoords: [number, number] = [position.coords.latitude, position.coords.longitude];
@@ -109,8 +108,12 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
           setLastUpdate(`${t.lastUpdate}: ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`);
           if (position.coords.heading !== null) setHeading(position.coords.heading);
         },
-        () => setLastUpdate(t.gpsWeak),
-        { enableHighAccuracy: true, timeout: 10000 }
+        (err) => {
+          console.log("GPS Tracking Error:", err);
+          setLastUpdate(t.gpsWeak);
+        },
+        // Force Maximum Accuracy & Disable old cached locations
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
 
@@ -118,6 +121,17 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
       if (watchId) navigator.geolocation.clearWatch(watchId);
     };
   }, [t.lastUpdate, t.gpsWeak]);
+
+  // 🔥 FIX 2: AUTO-CAMERA PANNING (Jise hi user hilega, Map camera follow karega)
+  useEffect(() => {
+    if (mapInstanceRef.current && coords[0] !== DEFAULT_COORDS[0]) {
+      // Map ko nayi location par center karo
+      mapInstanceRef.current.setView(coords, mapInstanceRef.current.getZoom(), {
+        animate: true,
+        duration: 0.5
+      });
+    }
+  }, [coords]);
 
   const handleShare = async () => {
     const lat = coords[0];
@@ -133,7 +147,6 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     }
   };
 
-  // 🔥 GOD MODE: TRIPLE ATTACK SMS (No Blocking)
   const handleMessageClick = () => {
     let phoneToMessage = "+919586875178"; 
     if (fastContact && fastContact.phone) phoneToMessage = fastContact.phone;
@@ -169,7 +182,6 @@ export default function Tracking({ onResolve, t }: TrackingProps) {
     }, 200);
   };
 
-  // 🔥 GOD MODE: TRIPLE ATTACK CALL (No Blocking)
   const handleCallSupport = () => {
     let phoneToCall = "+919586875178"; 
     if (fastContact && fastContact.phone) phoneToCall = fastContact.phone;
