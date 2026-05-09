@@ -35,6 +35,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       if (playPromise !== undefined) {
         playPromise.catch(error => {
           console.log("Autoplay blocked. User must touch screen.");
+          // Agar autoplay block hota hai toh silent fail hoga bina crash ke
         });
       }
     } catch (error) {
@@ -43,7 +44,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   };
 
   useEffect(() => {
-    // 500ms ka delay taaki transitions smooth ho jaye
+    // 500ms ka delay taaki transitions smooth ho jaye aur browser ready ho
     const audioTimer = setTimeout(() => {
       if (!hasSpokenRef.current) {
         speakSOS();
@@ -51,6 +52,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       }
     }, 500);
 
+    // Geolocation fix
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         () => setLocationStatus(t.locationAttached),
@@ -69,7 +71,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       clearTimeout(audioTimer);
       clearTimeout(statusTimer);
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (isActionDoneRef.current) return;
@@ -87,13 +89,17 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
 
   const handleCancel = () => {
     isActionDoneRef.current = true; 
-    if (audioRef.current) audioRef.current.pause();
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
     onCancel();
   };
 
   const handleSendNow = () => {
     isActionDoneRef.current = true; 
-    if (audioRef.current) audioRef.current.pause();
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
     onActivated();
   };
 
