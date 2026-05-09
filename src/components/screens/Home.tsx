@@ -112,51 +112,19 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     });
   };
 
-  // ⚡ THE ULTIMATE BRIDGE FIX FOR CALL
-  const handleQuickCall = () => {
-    let phoneToCall = "+919586875178"; // Default Fallback
-
-    if (fastContact && fastContact.phone) {
-      phoneToCall = fastContact.phone;
-    } else if (profile && profile.contacts && profile.contacts.length > 0) {
+  // 🔥 DIRECT HTML LINK LOGIC (Bypasses all Android Security Blocks)
+  const emergencyPhone = useMemo(() => {
+    if (fastContact && fastContact.phone) return fastContact.phone;
+    if (profile && profile.contacts && profile.contacts.length > 0) {
       const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
-      phoneToCall = starred.phone;
-    } 
-
-    const finalNumber = phoneToCall.replace(/\s+/g, '');
-
-    // WebView App ko direct message bhejo
-    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
-      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "CALL", number: finalNumber }));
-    } else {
-      // Agar PC ya normal browser par khola ho
-      window.location.href = `tel:${finalNumber}`; 
+      return starred.phone;
     }
-  };
+    return "+919586875178"; // Titanium Fallback
+  }, [fastContact, profile]);
 
-  // ⚡ THE ULTIMATE BRIDGE FIX FOR SMS
-  const handleQuickMessage = () => {
-    let phoneToMessage = "+919586875178"; // Default Fallback
-
-    if (fastContact && fastContact.phone) {
-      phoneToMessage = fastContact.phone;
-    } else if (profile && profile.contacts && profile.contacts.length > 0) {
-      const starred = profile.contacts.find((c: any) => c.isPrimary) || profile.contacts[0];
-      phoneToMessage = starred.phone;
-    } 
-
-    const finalNumber = phoneToMessage.replace(/\s+/g, '');
-    const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. Please respond ASAP. 🚨";
-    const msg = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}\n\n- Sent via SafeHelp App`;
-    
-    // WebView App ko direct message bhejo
-    if (typeof window !== 'undefined' && (window as any).ReactNativeWebView) {
-      (window as any).ReactNativeWebView.postMessage(JSON.stringify({ action: "SMS", number: finalNumber, text: msg }));
-    } else {
-      // Agar PC ya normal browser par khola ho
-      window.location.href = `sms:${finalNumber}?body=${encodeURIComponent(msg)}`;
-    }
-  };
+  const cleanPhone = emergencyPhone.replace(/\s+/g, '');
+  const customMessage = settings?.sosMessage || "🚨 EMERGENCY! I need help immediately. Please respond ASAP. 🚨";
+  const smsBody = `🚨 EMERGENCY ALERT 🚨\n\n${customMessage}\n\n- Sent via SafeHelp App`;
 
   // 🔹 Advanced Shake Detection System
   const shakeStartTimeRef = useRef<number>(0);
@@ -315,22 +283,22 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
           </Button>
           
           <div className="grid grid-cols-2 gap-4">
-            <Button 
-              onClick={handleQuickCall}
-              variant="outline"
-              className="h-20 rounded-[1.5rem] bg-secondary/30 flex flex-col items-center justify-center border-none active:scale-95 transition-all group"
+            {/* 🔥 Yahan Button ki jagah <a> tags lagaye hain jo ekdum Button jaise dikhte hain */}
+            <a 
+              href={`tel:${cleanPhone}`}
+              className="h-20 rounded-[1.5rem] bg-secondary/30 flex flex-col items-center justify-center border-none active:scale-95 transition-all group no-underline text-foreground"
             >
               <Phone className="w-6 h-6 text-green-500 mb-1 group-active:scale-90" />
               <span className="text-[10px] font-bold uppercase tracking-tighter">{t.quickCall}</span>
-            </Button>
-            <Button 
-              onClick={handleQuickMessage}
-              variant="outline"
-              className="h-20 rounded-[1.5rem] bg-secondary/30 flex flex-col items-center justify-center border-none active:scale-95 transition-all group"
+            </a>
+            
+            <a 
+              href={`sms:${cleanPhone}?body=${encodeURIComponent(smsBody)}`}
+              className="h-20 rounded-[1.5rem] bg-secondary/30 flex flex-col items-center justify-center border-none active:scale-95 transition-all group no-underline text-foreground"
             >
               <MessageSquare className="w-6 h-6 text-blue-400 mb-1 group-active:scale-90" />
               <span className="text-[10px] font-bold uppercase tracking-tighter">{t.quickSms}</span>
-            </Button>
+            </a>
           </div>
         </div>
 
