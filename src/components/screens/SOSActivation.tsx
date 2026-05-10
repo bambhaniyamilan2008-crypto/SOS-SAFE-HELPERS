@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { MapPin, X, Check, ShieldAlert } from "lucide-react";
 
 // 🔥 FIREBASE IMPORTS
 import { collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
+import { useUser, useDoc } from "@/firebase"; // ✅ Naya Import
 
 interface SOSActivationProps {
   onCancel: () => void;
@@ -15,6 +16,8 @@ interface SOSActivationProps {
 }
 
 export default function SOSActivation({ onCancel, onActivated, t }: SOSActivationProps) {
+  const { user } = useUser(); // ✅ User uthaya
+  
   const [countdown, setCountdown] = useState(3);
   const [locationStatus, setLocationStatus] = useState(t.fetchingLocation);
   const [messageStatus, setMessageStatus] = useState(t.preparingAlert);
@@ -38,11 +41,27 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   // 🚀 ALERT SEND FUNCTION
   const fireDashboardAlert = async () => {
     try {
-      // 1. Bina GPS wait kiye turant alert bhejo
+      // 🔥 GOD MODE: Cache aur Profile se asli naam nikalna
+      let finalName = user?.displayName || "Unknown User";
+      let finalPhone = "Not Provided";
+      const finalUserId = user?.uid || "unknown_id";
+
+      if (typeof window !== 'undefined') {
+        const cachedProfile = localStorage.getItem('safehelp_profile_cache');
+        if (cachedProfile) {
+          try {
+            const parsed = JSON.parse(cachedProfile);
+            if (parsed.name) finalName = parsed.name;
+            if (parsed.phone) finalPhone = parsed.phone;
+          } catch (e) {}
+        }
+      }
+
+      // 1. Bina GPS wait kiye turant alert bhejo (ASLI NAAM KE SATH)
       const docRef = await addDoc(collection(db, "alerts"), {
-        userName: "Milan",
-        userId: "milan_2103_8", 
-        phone: "+91 91041XXXXX", 
+        userName: finalName, 
+        userId: finalUserId, 
+        phone: finalPhone, 
         status: "active",
         timestamp: serverTimestamp(),
         type: "Panic Button",
@@ -51,7 +70,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       });
       
       alertIdRef.current = docRef.id;
-      console.log("🚨 Alert Live! ID:", docRef.id);
+      console.log("🚨 Alert Live! ID:", docRef.id, "By:", finalName);
 
       // 2. Background mein GPS location update karo
       navigator.geolocation.getCurrentPosition(
