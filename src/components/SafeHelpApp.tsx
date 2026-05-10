@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -37,12 +36,24 @@ export default function SafeHelpApp() {
   const [isSOSActive, setIsSOSActive] = useState(false);
   const [lang, setLang] = useState<Language>('en');
 
+  // 🔥 Yahan hum memory se "mr." wala naam nikalenge
+  const [cachedName, setCachedName] = useState("mr.");
+
   // Load language from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedLang = localStorage.getItem("lang") as Language;
       if (savedLang && ['en', 'hi', 'gu'].includes(savedLang)) {
         setLang(savedLang);
+      }
+      
+      // ✅ Cache se profile name uthao
+      const profileCache = localStorage.getItem('safehelp_profile_cache');
+      if (profileCache) {
+        try {
+          const parsed = JSON.parse(profileCache);
+          if (parsed.name) setCachedName(parsed.name);
+        } catch (e) {}
       }
     }
   }, []);
@@ -136,7 +147,8 @@ export default function SafeHelpApp() {
       )}
       {currentScreen === "home" && (
         <Home 
-          userName={profile?.name || user?.displayName || "User"} 
+          // 🔥 MAGIC HERE: Google ka naam hata diya, ab sirf Profile Name ya 'mr.' dikhega
+          userName={profile?.name || cachedName} 
           isSOSActive={isSOSActive}
           navigateTo={navigateTo} 
           t={t}
