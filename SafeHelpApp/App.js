@@ -134,15 +134,28 @@ export default function App() {
     };
   }, [canGoBack]);
 
-  // 🚀 NEW: TOKEN SENDER FUNCTION (Taaki Firebase me save ho sake)
+  // 🚀 SUPER GOD MODE: TOKEN SENDER FUNCTION (With Delay & Alert)
   const sendTokenToWeb = () => {
     if (expoPushToken && webViewRef.current) {
       console.log("📡 Sending Token to Vercel App...");
+      
+      // Ye tumhe dikhayega ki Phone ne apna kaam kar diya hai
+      Alert.alert("Setup Complete", "Device ready for Push Notifications.");
+
+      // Delay lagaya hai taaki Vercel website puri load ho jaye
       const script = `
-        try {
-          window.postMessage(JSON.stringify({ type: 'PUSH_TOKEN', token: '${expoPushToken}' }), '*');
-          document.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'PUSH_TOKEN', token: '${expoPushToken}' }) }));
-        } catch(e) {}
+        setTimeout(function() {
+          try {
+            // Method A: Direct Call
+            if(typeof window.receiveTokenFromAndroid === 'function') {
+              window.receiveTokenFromAndroid('${expoPushToken}');
+            }
+            
+            // Method B: Event Listener Call
+            window.postMessage(JSON.stringify({ type: 'PUSH_TOKEN', token: '${expoPushToken}' }), '*');
+            document.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'PUSH_TOKEN', token: '${expoPushToken}' }) }));
+          } catch(e) {}
+        }, 2500); // 2.5 Seconds wait karega
         true;
       `;
       webViewRef.current.injectJavaScript(script);
@@ -167,7 +180,7 @@ export default function App() {
         source={{ uri: 'https://sos-safe-helpers.vercel.app/' }} 
         style={styles.webview}
         originWhitelist={['*']}
-        onLoadEnd={sendTokenToWeb} // 🚀 NEW: Website load hote hi Token bhej dega
+        onLoadEnd={sendTokenToWeb} // 🚀 Load hone ke baad token bhejega
         onMessage={(event) => {
           try {
             const data = JSON.parse(event.nativeEvent.data);
