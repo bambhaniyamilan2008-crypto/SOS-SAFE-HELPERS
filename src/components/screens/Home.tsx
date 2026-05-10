@@ -314,7 +314,9 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
         
         <div className="text-center space-y-1 mt-4">
           {/* 🔥 SIRF GOD NAME DIKHEGA, GOOGLE WALA HATA DIYA HAI 🔥 */}
-          <h1 className="text-3xl font-headline font-bold">{t.hello}, {godName}</h1>
+          <h1 className="text-3xl font-headline font-bold">
+  {t.hello}, {profile?.name || user?.displayName || "User"}
+        </h1>
           <p className="text-muted-foreground font-medium text-sm">{t.tapEmergency}</p>
         </div>
 
