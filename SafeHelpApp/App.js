@@ -134,6 +134,21 @@ export default function App() {
     };
   }, [canGoBack]);
 
+  // 🚀 NEW: TOKEN SENDER FUNCTION (Taaki Firebase me save ho sake)
+  const sendTokenToWeb = () => {
+    if (expoPushToken && webViewRef.current) {
+      console.log("📡 Sending Token to Vercel App...");
+      const script = `
+        try {
+          window.postMessage(JSON.stringify({ type: 'PUSH_TOKEN', token: '${expoPushToken}' }), '*');
+          document.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'PUSH_TOKEN', token: '${expoPushToken}' }) }));
+        } catch(e) {}
+        true;
+      `;
+      webViewRef.current.injectJavaScript(script);
+    }
+  };
+
   if (!isAppSafeAndReady) {
     return (
       <View style={styles.loadingContainer}>
@@ -152,6 +167,7 @@ export default function App() {
         source={{ uri: 'https://sos-safe-helpers.vercel.app/' }} 
         style={styles.webview}
         originWhitelist={['*']}
+        onLoadEnd={sendTokenToWeb} // 🚀 NEW: Website load hote hi Token bhej dega
         onMessage={(event) => {
           try {
             const data = JSON.parse(event.nativeEvent.data);

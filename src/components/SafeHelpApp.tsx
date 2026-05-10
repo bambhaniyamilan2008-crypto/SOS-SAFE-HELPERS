@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Onboarding from "./screens/Onboarding";
-import EmergencySetup from "./screens/EmergencySetup"; 
+import EmergencySetup from "./screens/EmergencySetup"; // ✅ Naya Setup Screen
 import Home from "./screens/Home";
 import Contacts from "./screens/Contacts";
 import SOSActivation from "./screens/SOSActivation";
@@ -12,7 +12,10 @@ import Profile from "./screens/Profile";
 import Auth from "./screens/Auth";
 import VoiceCommand from "./screens/VoiceCommand";
 import { useUser, useDoc, useFirestore, useFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+
+// 🚀 FIREBASE IMPORTS FOR TOKEN
+import { doc, setDoc, serverTimestamp } from "firebase/firestore"; 
+
 import { ShieldAlert, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Language, translations } from "@/lib/translations";
@@ -39,7 +42,36 @@ export default function SafeHelpApp() {
   const [lang, setLang] = useState<Language>('en');
   const [cachedName, setCachedName] = useState("mr.");
 
-  // 🔥 1. Load language and Cache Name
+  // 🔥 1. NATIVE BRIDGE: PUSH TOKEN RECEIVER
+  useEffect(() => {
+    const handleNativeMessage = async (event: any) => {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        
+        if (data.type === "PUSH_TOKEN" && user && db) {
+          console.log("📡 Native Bridge: Token Received ->", data.token);
+          const userRef = doc(db, "users", user.uid);
+          await setDoc(userRef, { 
+            pushToken: data.token,
+            lastTokenSync: serverTimestamp(),
+            platform: "android"
+          }, { merge: true });
+        }
+      } catch (e) {
+        // Ignore background web messages
+      }
+    };
+
+    window.addEventListener("message", handleNativeMessage);
+    document.addEventListener("message", handleNativeMessage);
+
+    return () => {
+      window.removeEventListener("message", handleNativeMessage);
+      document.removeEventListener("message", handleNativeMessage);
+    };
+  }, [user, db]);
+
+  // 🔥 2. LANGUAGE & CACHE LOADER
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedLang = localStorage.getItem("lang") as Language;
@@ -59,7 +91,7 @@ export default function SafeHelpApp() {
 
   const t = useMemo(() => translations[lang], [lang]);
 
-  // 🔥 2. Firebase Configuration Safety Check (Wapas Add Kiya)
+  // 🔥 3. FIREBASE CONFIGURATION CHECK (Wapas Add Kiya)
   const isConfigured = useMemo(() => {
     return !!auth && !!firestore && !!auth.app.options.apiKey && auth.app.options.apiKey.length > 10;
   }, [auth, firestore]);
@@ -71,7 +103,7 @@ export default function SafeHelpApp() {
   
   const { data: profile } = useDoc(userRef);
 
-  // 🔥 3. God Mode Navigation Engine
+  // 🔥 4. GOD MODE NAVIGATION ENGINE
   useEffect(() => {
     if (!isConfigured) {
       setCurrentScreen("setup");
@@ -88,7 +120,6 @@ export default function SafeHelpApp() {
         } else if (!emergencyDone) {
           setCurrentScreen("emergency-setup");
         } else {
-          // Go to home only if we are coming from restricted screens
           if (["loading", "auth", "onboarding", "emergency-setup"].includes(currentScreen)) {
             setCurrentScreen("home");
           }
@@ -97,7 +128,7 @@ export default function SafeHelpApp() {
         setCurrentScreen("auth");
       }
     }
-  }, [user, authLoading, isConfigured, currentScreen]);
+  }, [user, authLoading, isConfigured, profile, currentScreen]);
 
   const navigateTo = (screen: AppScreen) => {
     setCurrentScreen(screen);
@@ -108,7 +139,7 @@ export default function SafeHelpApp() {
     localStorage.setItem("lang", newLang);
   };
 
-  // 🔥 4. Return Setup Error Screen
+  // 🔥 5. SETUP REQUIRED SCREEN (Wapas Add Kiya)
   if (currentScreen === "setup") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center bg-background">
@@ -119,6 +150,7 @@ export default function SafeHelpApp() {
         <p className="text-muted-foreground mb-8 max-w-xs leading-relaxed">
           SafeHelp needs a valid Firebase configuration to securely sync your emergency profile.
         </p>
+        
         <Button 
           onClick={() => window.location.reload()} 
           className="w-full max-w-sm h-14 rounded-2xl font-bold glow-primary"
@@ -130,7 +162,7 @@ export default function SafeHelpApp() {
     );
   }
 
-  // 🔥 5. Return Loading Screen
+  // 🔥 6. LOADING SCREEN
   if (currentScreen === "loading") return (
     <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
       <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -138,7 +170,7 @@ export default function SafeHelpApp() {
     </div>
   );
 
-  // 🔥 6. Main App Screens
+  // 🔥 7. MAIN APP RENDER
   return (
     <div className="max-w-md mx-auto min-h-screen bg-background relative flex flex-col">
       {currentScreen === "auth" && (
@@ -167,11 +199,11 @@ export default function SafeHelpApp() {
           t={t}
         />
       )}
-
+      
       {currentScreen === "contacts" && (
         <Contacts navigateTo={navigateTo} />
       )}
-
+      
       {currentScreen === "sos-activation" && (
         <SOSActivation 
           onCancel={() => navigateTo("home")}
@@ -182,7 +214,7 @@ export default function SafeHelpApp() {
           t={t}
         />
       )}
-
+      
       {currentScreen === "tracking" && (
         <Tracking 
           onResolve={() => {
@@ -192,15 +224,15 @@ export default function SafeHelpApp() {
           t={t}
         />
       )}
-
+      
       {currentScreen === "settings" && (
         <Settings navigateTo={navigateTo} lang={lang} setLang={handleSetLang} t={t} />
       )}
-
+      
       {currentScreen === "profile" && (
         <Profile navigateTo={navigateTo} />
       )}
-
+      
       {currentScreen === "voice-command" && (
         <VoiceCommand 
           navigateTo={navigateTo} 
