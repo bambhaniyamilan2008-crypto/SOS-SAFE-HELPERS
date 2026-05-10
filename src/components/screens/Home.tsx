@@ -39,9 +39,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   const [shakeSensitivity, setShakeSensitivity] = useState("high");
   const [fastContact, setFastContact] = useState<any>(null);
   const [shakeStatus, setShakeStatus] = useState<"idle" | "detected" | "triggered">("idle");
-  
-  // 🔥 GOD MODE CACHE STATE FOR NAME
-  const [displayUserName, setDisplayUserName] = useState(userName);
 
   const userRef = useMemo(() => {
     if (!user || !db) return null;
@@ -62,7 +59,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     document.documentElement.style.overflowX = 'hidden';
   }, []);
 
-  // 🔥 FAST CACHE ENGINE: Profile Name aur Contacts load karega
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const cachedContact = localStorage.getItem('safehelp_fast_contact');
@@ -77,32 +73,16 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
           setShakeSensitivity(parsed.shakeSensitivity || "high");
         } catch (e) {}
       }
-      
-      // ✅ Yahan se hum Profile ka save kiya hua naam uthayenge
-      const cachedProfile = localStorage.getItem('safehelp_profile_cache');
-      if (cachedProfile) {
-        try {
-          const profileData = JSON.parse(cachedProfile);
-          if (profileData.name) setDisplayUserName(profileData.name);
-        } catch (e) {}
-      }
     }
   }, []);
 
   useEffect(() => {
-    if (profile) {
-      // Background mein naam update karo agar Firebase par naya hai
-      if (profile.name) {
-        setDisplayUserName(profile.name);
-      }
-      
-      if (profile.contacts && profile.contacts.length > 0) {
-        const starred = profile.contacts.find((c: any) => c.isPrimary);
-        const contactToSave = starred || profile.contacts[0];
-        setFastContact(contactToSave); 
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('safehelp_fast_contact', JSON.stringify(contactToSave));
-        }
+    if (profile && profile.contacts && profile.contacts.length > 0) {
+      const starred = profile.contacts.find((c: any) => c.isPrimary);
+      const contactToSave = starred || profile.contacts[0];
+      setFastContact(contactToSave); 
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('safehelp_fast_contact', JSON.stringify(contactToSave));
       }
     }
   }, [profile]);
@@ -118,17 +98,21 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   }, [settings]);
 
   const handleSOSClick = () => {
+    // 🔥 STEP 1: Audio ko 'Unlock' karo aur Window par save karo
     try {
       const API_KEY = "66def89da92b48fbbc5ee6b34eab3456";
       const audioUrl = `https://api.voicerss.org/?key=${API_KEY}&hl=en-in&v=Jai&c=MP3&src=SOS%20Activated`;
       
+      // Ek invisible audio object banao jo click ke sath hi "Load" ho jaye
       const sosAudio = new Audio(audioUrl);
       sosAudio.load(); 
       
+      // Isko window object mein daal do taaki dusri screen isse utha sake
       (window as any).sosVoice = sosAudio;
       
+      // Ek silent play taaki browser permission mil jaye
       sosAudio.play().then(() => {
-        sosAudio.pause(); 
+        sosAudio.pause(); // Turant pause karo, Activation screen par bajayenge
         sosAudio.currentTime = 0;
       }).catch(() => {});
     } catch (e) {
@@ -137,7 +121,6 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     
     navigateTo("sos-activation");
   };
-  
   const toggleShake = async (val: boolean) => {
     setShakeEnabled(val);
     if (typeof window !== 'undefined') {
@@ -311,12 +294,12 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
 
       <div className="flex-1 flex flex-col items-center px-6 pb-12 w-full max-w-md mx-auto space-y-10">
         <div className="text-center space-y-1 mt-4">
-          {/* ✅ YAHAN MAGIC HUA HAI: displayUserName use ho raha hai */}
-          <h1 className="text-3xl font-headline font-bold">{t.hello}, {displayUserName}</h1>
+          <h1 className="text-3xl font-headline font-bold">{t.hello}, {userName}</h1>
           <p className="text-muted-foreground font-medium text-sm">{t.tapEmergency}</p>
         </div>
 
         <div className="relative flex items-center justify-center w-full">
+          {/* 🔥 MODIFIED SOS BUTTON WITH TRIGGER */}
           <button 
             onClick={handleSOSClick} 
             className={cn("w-64 h-64 rounded-full sos-gradient flex flex-col items-center justify-center transition-all duration-300 active:scale-95 shadow-2xl relative z-10", isSOSActive ? 'animate-blink' : 'pulse-primary')}
