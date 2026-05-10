@@ -10,28 +10,83 @@ import {
   StyleSheet,
   Text,
   ToastAndroid,
-  Linking 
+  Linking,
+  Platform
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
+
+// Notification behavior set karo
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function App() {
   const webViewRef = useRef(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [isAppSafeAndReady, setIsAppSafeAndReady] = useState(false);
+  const [expoPushToken, setExpoPushToken] = useState('');
   const exitAppTimerRef = useRef(0);
+
+  // --- 🔥 PUSH NOTIFICATION TOKEN LOGIC ---
+  async function registerForPushNotificationsAsync() {
+    let token;
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        console.log('Failed to get push token for push notification!');
+        return;
+      }
+      
+      // EAS Project ID check
+      const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+      
+      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      console.log("🚀 YOUR PUSH TOKEN:", token);
+    } else {
+      console.log('Must use physical device for Push Notifications');
+    }
+
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+    return token;
+  }
 
   useEffect(() => {
     let shakeSubscription;
 
     const setupApp = async () => {
       try {
+        // 1. Get Push Token
+        const token = await registerForPushNotificationsAsync();
+        setExpoPushToken(token);
+
+        // 2. Location Permission
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert("Permission Needed", "SOS and Location features require permission.", [{ text: "OK" }]);
+          Alert.alert("Permission Needed", "SOS features require location permission.", [{ text: "OK" }]);
         }
 
+        // 3. Shake SOS Logic
         Accelerometer.setUpdateInterval(200);
         shakeSubscription = Accelerometer.addListener(data => {
           const force = Math.sqrt(data.x**2 + data.y**2 + data.z**2);
@@ -92,15 +147,11 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
-      
       <WebView 
         ref={webViewRef}
         source={{ uri: 'https://sos-safe-helpers.vercel.app/' }} 
         style={styles.webview}
-        
         originWhitelist={['*']}
-        
-        // 🔥 ULTIMATE BYPASS 1: Direct Bridge from Website
         onMessage={(event) => {
           try {
             const data = JSON.parse(event.nativeEvent.data);
@@ -113,43 +164,22 @@ export default function App() {
             console.log("Bridge Error: ", error);
           }
         }}
-
-        // 🔥 ULTIMATE BYPASS 2: Link Interceptor (Agar HTML tag click hua toh)
         onShouldStartLoadWithRequest={(request) => {
           const url = request.url;
           if (url.startsWith('tel:') || url.startsWith('sms:') || url.startsWith('mailto:') || url.startsWith('whatsapp:')) {
             Linking.openURL(url).catch(err => console.log('Linking Error:', err));
-            return false; // WebView ko URL kholne se rokta hai aur phone ko de deta hai
+            return false;
           }
-          return true; // Baaki website normal chalegi
+          return true;
         }}
-
         javaScriptEnabled={true}
         domStorageEnabled={true}
         geolocationEnabled={true} 
         allowsInlineMediaPlayback={true} 
         userAgent="Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36"
-        
-        injectedJavaScript={`
-          const meta = document.createElement('meta'); 
-          meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0'); 
-          meta.setAttribute('name', 'viewport'); 
-          document.getElementsByTagName('head')[0].appendChild(meta);
-          true;
-        `}
-        
         onNavigationStateChange={(navState) => {
           setCanGoBack(navState.canGoBack);
-          
-          // 🔥 ULTIMATE BYPASS 3: Fallback Navigation Catcher
-          if (navState.url.startsWith('tel:') || navState.url.startsWith('sms:')) {
-            if (webViewRef.current) {
-              webViewRef.current.stopLoading(); // WebView ko rok do
-            }
-            Linking.openURL(navState.url).catch(e => console.log(e));
-          }
         }}
-        
         startInLoadingState={true}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
