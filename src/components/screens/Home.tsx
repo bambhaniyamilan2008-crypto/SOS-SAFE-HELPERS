@@ -24,7 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 interface HomeProps {
-  userName: string;
+  userName: string; // Ise hum ignore karenge ab
   isSOSActive: boolean;
   navigateTo: (screen: AppScreen) => void;
   t: any;
@@ -39,6 +39,9 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   const [shakeSensitivity, setShakeSensitivity] = useState("high");
   const [fastContact, setFastContact] = useState<any>(null);
   const [shakeStatus, setShakeStatus] = useState<"idle" | "detected" | "triggered">("idle");
+
+  // 🔥 ULTRA GOD MODE: Google ka naam hata kar default "mr." set kiya
+  const [godName, setGodName] = useState("mr.");
 
   const userRef = useMemo(() => {
     if (!user || !db) return null;
@@ -58,6 +61,24 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     document.body.style.overflowX = 'hidden';
     document.documentElement.style.overflowX = 'hidden';
   }, []);
+
+  // 🔥 ULTRA GOD MODE ENGINE: Sirf Profile ka data uthayega
+  useEffect(() => {
+    // 1. Agar Firebase mein naam save hai, toh wo dikhao
+    if (profile && profile.name) {
+      setGodName(profile.name);
+    } 
+    // 2. Warna Local Phone Cache se uthao
+    else if (typeof window !== 'undefined') {
+      const cachedProfile = localStorage.getItem('safehelp_profile_cache');
+      if (cachedProfile) {
+        try {
+          const parsed = JSON.parse(cachedProfile);
+          if (parsed.name) setGodName(parsed.name);
+        } catch (e) {}
+      }
+    }
+  }, [profile]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -98,21 +119,17 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
   }, [settings]);
 
   const handleSOSClick = () => {
-    // 🔥 STEP 1: Audio ko 'Unlock' karo aur Window par save karo
     try {
       const API_KEY = "66def89da92b48fbbc5ee6b34eab3456";
       const audioUrl = `https://api.voicerss.org/?key=${API_KEY}&hl=en-in&v=Jai&c=MP3&src=SOS%20Activated`;
       
-      // Ek invisible audio object banao jo click ke sath hi "Load" ho jaye
       const sosAudio = new Audio(audioUrl);
       sosAudio.load(); 
       
-      // Isko window object mein daal do taaki dusri screen isse utha sake
       (window as any).sosVoice = sosAudio;
       
-      // Ek silent play taaki browser permission mil jaye
       sosAudio.play().then(() => {
-        sosAudio.pause(); // Turant pause karo, Activation screen par bajayenge
+        sosAudio.pause(); 
         sosAudio.currentTime = 0;
       }).catch(() => {});
     } catch (e) {
@@ -121,6 +138,7 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
     
     navigateTo("sos-activation");
   };
+
   const toggleShake = async (val: boolean) => {
     setShakeEnabled(val);
     if (typeof window !== 'undefined') {
@@ -293,13 +311,14 @@ export default function Home({ userName, isSOSActive, navigateTo, t }: HomeProps
       </div>
 
       <div className="flex-1 flex flex-col items-center px-6 pb-12 w-full max-w-md mx-auto space-y-10">
+        
         <div className="text-center space-y-1 mt-4">
-          <h1 className="text-3xl font-headline font-bold">{t.hello}, {userName}</h1>
+          {/* 🔥 SIRF GOD NAME DIKHEGA, GOOGLE WALA HATA DIYA HAI 🔥 */}
+          <h1 className="text-3xl font-headline font-bold">{t.hello}, {godName}</h1>
           <p className="text-muted-foreground font-medium text-sm">{t.tapEmergency}</p>
         </div>
 
         <div className="relative flex items-center justify-center w-full">
-          {/* 🔥 MODIFIED SOS BUTTON WITH TRIGGER */}
           <button 
             onClick={handleSOSClick} 
             className={cn("w-64 h-64 rounded-full sos-gradient flex flex-col items-center justify-center transition-all duration-300 active:scale-95 shadow-2xl relative z-10", isSOSActive ? 'animate-blink' : 'pulse-primary')}
