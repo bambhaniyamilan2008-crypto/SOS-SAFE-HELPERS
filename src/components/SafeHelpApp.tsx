@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Onboarding from "./screens/Onboarding";
+import EmergencySetup from "./screens/EmergencySetup"; 
 import Home from "./screens/Home";
 import Contacts from "./screens/Contacts";
 import SOSActivation from "./screens/SOSActivation";
@@ -18,6 +19,7 @@ import { Language, translations } from "@/lib/translations";
 
 export type AppScreen = 
   | "onboarding"
+  | "emergency-setup"
   | "auth" 
   | "home" 
   | "contacts" 
@@ -35,11 +37,9 @@ export default function SafeHelpApp() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen | "loading" | "setup">("loading");
   const [isSOSActive, setIsSOSActive] = useState(false);
   const [lang, setLang] = useState<Language>('en');
-
-  // 🔥 Yahan hum memory se "mr." wala naam nikalenge
   const [cachedName, setCachedName] = useState("mr.");
 
-  // Load language from localStorage
+  // 🔥 1. Load language and Cache Name
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedLang = localStorage.getItem("lang") as Language;
@@ -47,7 +47,6 @@ export default function SafeHelpApp() {
         setLang(savedLang);
       }
       
-      // ✅ Cache se profile name uthao
       const profileCache = localStorage.getItem('safehelp_profile_cache');
       if (profileCache) {
         try {
@@ -60,6 +59,7 @@ export default function SafeHelpApp() {
 
   const t = useMemo(() => translations[lang], [lang]);
 
+  // 🔥 2. Firebase Configuration Safety Check (Wapas Add Kiya)
   const isConfigured = useMemo(() => {
     return !!auth && !!firestore && !!auth.app.options.apiKey && auth.app.options.apiKey.length > 10;
   }, [auth, firestore]);
@@ -71,6 +71,7 @@ export default function SafeHelpApp() {
   
   const { data: profile } = useDoc(userRef);
 
+  // 🔥 3. God Mode Navigation Engine
   useEffect(() => {
     if (!isConfigured) {
       setCurrentScreen("setup");
@@ -79,14 +80,16 @@ export default function SafeHelpApp() {
 
     if (!authLoading) {
       if (user) {
-        // User is logged in, check onboarding status from localStorage
         const onboardingDone = typeof window !== 'undefined' ? localStorage.getItem("onboardingSeen") === "true" : false;
+        const emergencyDone = typeof window !== 'undefined' ? localStorage.getItem("emergencySetupDone") === "true" : false;
         
         if (!onboardingDone) {
           setCurrentScreen("onboarding");
+        } else if (!emergencyDone) {
+          setCurrentScreen("emergency-setup");
         } else {
-          // Onboarding done, go straight to home
-          if (["loading", "auth", "onboarding"].includes(currentScreen)) {
+          // Go to home only if we are coming from restricted screens
+          if (["loading", "auth", "onboarding", "emergency-setup"].includes(currentScreen)) {
             setCurrentScreen("home");
           }
         }
@@ -94,7 +97,7 @@ export default function SafeHelpApp() {
         setCurrentScreen("auth");
       }
     }
-  }, [user, authLoading, isConfigured, profile, currentScreen]);
+  }, [user, authLoading, isConfigured, currentScreen]);
 
   const navigateTo = (screen: AppScreen) => {
     setCurrentScreen(screen);
@@ -105,6 +108,7 @@ export default function SafeHelpApp() {
     localStorage.setItem("lang", newLang);
   };
 
+  // 🔥 4. Return Setup Error Screen
   if (currentScreen === "setup") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center bg-background">
@@ -115,7 +119,6 @@ export default function SafeHelpApp() {
         <p className="text-muted-foreground mb-8 max-w-xs leading-relaxed">
           SafeHelp needs a valid Firebase configuration to securely sync your emergency profile.
         </p>
-        
         <Button 
           onClick={() => window.location.reload()} 
           className="w-full max-w-sm h-14 rounded-2xl font-bold glow-primary"
@@ -127,6 +130,7 @@ export default function SafeHelpApp() {
     );
   }
 
+  // 🔥 5. Return Loading Screen
   if (currentScreen === "loading") return (
     <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
       <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -134,29 +138,40 @@ export default function SafeHelpApp() {
     </div>
   );
 
+  // 🔥 6. Main App Screens
   return (
     <div className="max-w-md mx-auto min-h-screen bg-background relative flex flex-col">
       {currentScreen === "auth" && (
         <Auth onAuthSuccess={() => {}} />
       )}
+      
       {currentScreen === "onboarding" && (
         <Onboarding onComplete={() => {
           localStorage.setItem("onboardingSeen", "true");
-          navigateTo("home");
+          navigateTo("emergency-setup");
         }} />
       )}
+
+      {currentScreen === "emergency-setup" && (
+        <EmergencySetup onComplete={() => {
+          localStorage.setItem("emergencySetupDone", "true");
+          navigateTo("home");
+        }} t={t} />
+      )}
+
       {currentScreen === "home" && (
         <Home 
-          // 🔥 MAGIC HERE: Google ka naam hata diya, ab sirf Profile Name ya 'mr.' dikhega
           userName={profile?.name || cachedName} 
           isSOSActive={isSOSActive}
           navigateTo={navigateTo} 
           t={t}
         />
       )}
+
       {currentScreen === "contacts" && (
         <Contacts navigateTo={navigateTo} />
       )}
+
       {currentScreen === "sos-activation" && (
         <SOSActivation 
           onCancel={() => navigateTo("home")}
@@ -167,6 +182,7 @@ export default function SafeHelpApp() {
           t={t}
         />
       )}
+
       {currentScreen === "tracking" && (
         <Tracking 
           onResolve={() => {
@@ -176,12 +192,15 @@ export default function SafeHelpApp() {
           t={t}
         />
       )}
+
       {currentScreen === "settings" && (
         <Settings navigateTo={navigateTo} lang={lang} setLang={handleSetLang} t={t} />
       )}
+
       {currentScreen === "profile" && (
         <Profile navigateTo={navigateTo} />
       )}
+
       {currentScreen === "voice-command" && (
         <VoiceCommand 
           navigateTo={navigateTo} 
