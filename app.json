@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "754ead63-f19f-428e-bf24-9de998b1bc58"
+      }
+    },
+    "android": {
+      "package": "com.mrbambhaniya13.safehelpapp"
+    }
+  }
+}

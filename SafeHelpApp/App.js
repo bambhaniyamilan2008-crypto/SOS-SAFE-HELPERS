@@ -143,11 +143,21 @@ export default function App() {
 
   // 🚀 ALERT SENDER FUNCTION
   const sendTokenToWeb = () => {
-    if (expoPushToken) {
-      Alert.alert("Setup Complete", "Device ready for Push Notifications.");
+    if (expoPushToken && webViewRef.current) {
+      // ✅ Alert hata diya (Ab shanti rahegi)
+      // console.log("Token sent to web via URL"); 
+
+      const script = `
+        try {
+          if(typeof window.receiveTokenFromAndroid === 'function') {
+            window.receiveTokenFromAndroid('${expoPushToken}');
+          }
+        } catch(e) {}
+        true;
+      `;
+      webViewRef.current.injectJavaScript(script);
     }
   };
-
   if (!isAppSafeAndReady) {
     return (
       <View style={styles.loadingContainer}>

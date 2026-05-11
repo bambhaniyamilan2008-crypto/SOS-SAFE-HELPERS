@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShieldAlert, Heart, User, Users, ArrowRight, Loader2 } from "lucide-react";
+import { ShieldAlert, Heart, User, Users, ArrowRight, Loader2, EyeOff, EarOff, Accessibility, UserCheck } from "lucide-react";
 import { useUser, useFirestore } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,9 @@ export default function EmergencySetup({ onComplete, t }: EmergencySetupProps) {
   const [motherPhone, setMotherPhone] = useState("+91 ");
   const [fatherPhone, setFatherPhone] = useState("+91 ");
   const [friendPhone, setFriendPhone] = useState("+91 ");
+
+  // 🌟 NAYA: Disability State (Default: None)
+  const [disability, setDisability] = useState("None");
 
   const formatPhone = (val: string) => {
     let raw = val;
@@ -54,14 +57,19 @@ export default function EmergencySetup({ onComplete, t }: EmergencySetupProps) {
 
     try {
       const userRef = doc(db, "users", user.uid);
-      await setDoc(userRef, { contacts: newContacts }, { merge: true });
+      
+      // 🌟 NAYA: Database save command me disabilityType add kar diya
+      await setDoc(userRef, { 
+        contacts: newContacts,
+        disabilityType: disability 
+      }, { merge: true });
       
       // Cache the first one for fast access
       if (typeof window !== 'undefined' && newContacts.length > 0) {
         localStorage.setItem('safehelp_fast_contact', JSON.stringify(newContacts[0]));
       }
       
-      toast({ title: "✅ Contacts Secured!" });
+      toast({ title: "✅ Setup Complete!" });
       onComplete(); // Move to Home
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -69,6 +77,14 @@ export default function EmergencySetup({ onComplete, t }: EmergencySetupProps) {
       setLoading(false);
     }
   };
+
+  // 🌟 NAYA: Disability Options Array for clean UI
+  const disabilityOptions = [
+    { id: "None", label: "General / None", icon: UserCheck, color: "text-slate-500", bg: "bg-slate-500/10" },
+    { id: "Visually Impaired", label: "Visually Impaired", icon: EyeOff, color: "text-indigo-500", bg: "bg-indigo-500/10" },
+    { id: "Hearing Impaired", label: "Hearing Impaired", icon: EarOff, color: "text-teal-500", bg: "bg-teal-500/10" },
+    { id: "Physically Disabled", label: "Physically Disabled", icon: Accessibility, color: "text-amber-500", bg: "bg-amber-500/10" }
+  ];
 
   return (
     <div className="flex flex-col min-h-screen bg-background p-6">
@@ -97,8 +113,8 @@ export default function EmergencySetup({ onComplete, t }: EmergencySetupProps) {
                 onChange={(e) => setMotherPhone(formatPhone(e.target.value))} 
                 className="h-10 text-lg font-bold border-none bg-transparent p-0 px-1 focus-visible:ring-0" 
                 placeholder="+91 0000000000"
-                type="tel"           // ✅ THEEK KIYA 
-                inputMode="tel"      // ✅ THEEK KIYA
+                type="tel"           
+                inputMode="tel"      
               />
             </div>
           </div>
@@ -115,8 +131,8 @@ export default function EmergencySetup({ onComplete, t }: EmergencySetupProps) {
                 onChange={(e) => setFatherPhone(formatPhone(e.target.value))} 
                 className="h-10 text-lg font-bold border-none bg-transparent p-0 px-1 focus-visible:ring-0" 
                 placeholder="+91 0000000000"
-                type="tel"           // ✅ THEEK KIYA 
-                inputMode="tel"      // ✅ THEEK KIYA
+                type="tel"           
+                inputMode="tel"      
               />
             </div>
           </div>
@@ -133,10 +149,44 @@ export default function EmergencySetup({ onComplete, t }: EmergencySetupProps) {
                 onChange={(e) => setFriendPhone(formatPhone(e.target.value))} 
                 className="h-10 text-lg font-bold border-none bg-transparent p-0 px-1 focus-visible:ring-0" 
                 placeholder="+91 0000000000"
-                type="tel"           // ✅ THEEK KIYA 
-                inputMode="tel"      // ✅ THEEK KIYA
+                type="tel"           
+                inputMode="tel"      
               />
             </div>
+          </div>
+        </div>
+
+        {/* 🌟 NAYA: DISABILITY SELECTOR SECTION */}
+        <div className="pt-2 space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="h-px bg-border/50 flex-1"></div>
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Select Special Need (If Any)</h3>
+            <div className="h-px bg-border/50 flex-1"></div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            {disabilityOptions.map((opt) => {
+              const isSelected = disability === opt.id;
+              const Icon = opt.icon;
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => setDisability(opt.id)}
+                  className={`flex flex-col items-center justify-center p-4 rounded-3xl border-2 transition-all duration-200 ${
+                    isSelected 
+                      ? "border-primary bg-primary/5 shadow-md scale-[1.02]" 
+                      : "border-border/50 bg-secondary/30 hover:bg-secondary/50"
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center mb-2 ${isSelected ? opt.bg : 'bg-foreground/5'}`}>
+                    <Icon className={`w-5 h-5 ${isSelected ? opt.color : 'text-muted-foreground'}`} />
+                  </div>
+                  <span className={`text-[11px] font-bold text-center leading-tight ${isSelected ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    {opt.label}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </div>
 
