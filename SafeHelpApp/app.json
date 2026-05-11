@@ -20,7 +20,9 @@
         "CAMERA",
         "RECORD_AUDIO",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -51,7 +53,8 @@
       ],
       "expo-web-browser",
       "expo-location",
-      "expo-sensors"
+      "expo-sensors",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -60,14 +63,12 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "17be2d03-d731-46f5-a368-825342c74016"
+        "projectId": "f1b99a6d-9067-4442-ba3f-4afffa2d57b9"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "updates": {
-      "url": "https://u.expo.dev/17be2d03-d731-46f5-a368-825342c74016"
-    }
+    "owner": "milanrbambhaniya13"
   }
 }

@@ -42,25 +42,43 @@ export default function SafeHelpApp() {
   const [lang, setLang] = useState<Language>('en');
   const [cachedName, setCachedName] = useState("mr.");
 
-  // 🔥 1. BULLETPROOF NATIVE BRIDGE (Push Token Catcher)
+  // 🚀 1. EMERGENCY BYPASS TIMER
+  // Agar Firebase 4 second tak jawaab nahi deta, toh app forcefully aage badh jayegi!
   useEffect(() => {
-    // Method A: Direct Global Function (Fail-safe)
+    const emergencyTimer = setTimeout(() => {
+      setCurrentScreen((prev) => {
+        if (prev === "loading") {
+          console.log("⚠️ Emergency Bypass: Loading Screen Force Stopped");
+          return user ? "home" : "auth";
+        }
+        return prev;
+      });
+    }, 4000); 
+    
+    return () => clearTimeout(emergencyTimer);
+  }, [user]);
+
+  // 🔥 2. BULLETPROOF NATIVE BRIDGE (With Smart Backup)
+  useEffect(() => {
+    // Method A: Direct Global Function
     (window as any).receiveTokenFromAndroid = async (token: string) => {
-      if (token && user && db) {
-        console.log("✅ Direct Bridge: Token Caught ->", token);
-        try {
-          const userRef = doc(db, "users", user.uid);
-          await setDoc(
-            userRef, 
-            { 
+      if (token) {
+        console.log("✅ Token Caught ->", token);
+        // Hamesha local memory me save karo backup ke liye
+        localStorage.setItem("expo_push_token", token); 
+        
+        // Agar user login hai, toh direct Firebase bhejo
+        if (user && db) {
+          try {
+            const userRef = doc(db, "users", user.uid);
+            await setDoc(userRef, { 
               pushToken: token,
               lastTokenSync: serverTimestamp(),
               platform: "android"
-            }, 
-            { merge: true }
-          );
-        } catch (e) {
-          console.error("Direct Save Error:", e);
+            }, { merge: true });
+          } catch (e) {
+            console.error("Direct Save Error:", e);
+          }
         }
       }
     };
@@ -69,18 +87,19 @@ export default function SafeHelpApp() {
     const handleNativeMessage = async (event: any) => {
       try {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (data.type === "PUSH_TOKEN" && user && db) {
+        if (data.type === "PUSH_TOKEN" && data.token) {
           console.log("📡 Event Bridge: Token Caught ->", data.token);
-          const userRef = doc(db, "users", user.uid);
-          await setDoc(
-            userRef, 
-            { 
+          // Hamesha local memory me save karo backup ke liye
+          localStorage.setItem("expo_push_token", data.token); 
+          
+          if (user && db) {
+            const userRef = doc(db, "users", user.uid);
+            await setDoc(userRef, { 
               pushToken: data.token,
               lastTokenSync: serverTimestamp(),
               platform: "android"
-            }, 
-            { merge: true }
-          );
+            }, { merge: true });
+          }
         }
       } catch (e) {
         // Silently ignore unrelated web messages
@@ -93,10 +112,31 @@ export default function SafeHelpApp() {
     return () => {
       window.removeEventListener("message", handleNativeMessage);
       document.removeEventListener("message", handleNativeMessage);
+      delete (window as any).receiveTokenFromAndroid;
     };
   }, [user, db]);
 
-  // 🔥 2. LANGUAGE & CACHE LOADER
+  // 🔥 3. AUTO-SYNC: JAISE HI LOGIN HO, BACKUP TOKEN FIREBASE BHEJO
+  useEffect(() => {
+    const uploadPendingToken = async () => {
+      const savedToken = localStorage.getItem("expo_push_token");
+      if (user && db && savedToken) {
+        try {
+          const userRef = doc(db, "users", user.uid);
+          await setDoc(userRef, { 
+            pushToken: savedToken,
+            lastTokenSync: serverTimestamp(),
+            platform: "android"
+          }, { merge: true });
+          console.log("🔄 Auto-Synced backup token to Firebase!");
+        } catch(e) {}
+      }
+    };
+    
+    uploadPendingToken();
+  }, [user, db]);
+
+  // 🔥 4. LANGUAGE & CACHE LOADER
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedLang = localStorage.getItem("lang") as Language;
@@ -128,7 +168,7 @@ export default function SafeHelpApp() {
   
   const { data: profile } = useDoc(userRef);
 
-  // 🔥 3. NAVIGATION LOGIC
+  // 🔥 5. NAVIGATION LOGIC
   useEffect(() => {
     if (!isConfigured) { 
       setCurrentScreen("setup"); 
@@ -164,8 +204,7 @@ export default function SafeHelpApp() {
     localStorage.setItem("lang", newLang);
   };
 
-  // 🔥 4. UI SCREENS
-
+  // 🔥 6. UI SCREENS
   if (currentScreen === "setup") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center bg-background">
