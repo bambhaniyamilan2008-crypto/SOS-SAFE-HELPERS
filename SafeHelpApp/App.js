@@ -47,15 +47,20 @@ export default function App() {
         finalStatus = status;
       }
       if (finalStatus !== 'granted') {
-        console.log('Failed to get push token for push notification!');
+        console.log('Failed to get push token!');
         return;
       }
       
       // EAS Project ID check
       const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
       
-      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-      console.log("🚀 YOUR PUSH TOKEN:", token);
+      try {
+        const response = await Notifications.getExpoPushTokenAsync({ projectId });
+        token = response.data;
+        console.log("🚀 YOUR PUSH TOKEN:", token);
+      } catch (e) {
+        Alert.alert("Token Error", String(e));
+      }
     } else {
       console.log('Must use physical device for Push Notifications');
     }
@@ -78,10 +83,12 @@ export default function App() {
       try {
         // 1. Get Push Token
         const token = await registerForPushNotificationsAsync();
-        setExpoPushToken(token);
+        if (token) {
+          setExpoPushToken(token);
+        }
 
         // 2. Location Permission
-        let { status } = await Location.requestForegroundPermissionsAsync();
+        const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           Alert.alert("Permission Needed", "SOS features require location permission.", [{ text: "OK" }]);
         }
@@ -134,31 +141,10 @@ export default function App() {
     };
   }, [canGoBack]);
 
-  // 🚀 SUPER GOD MODE: TOKEN SENDER FUNCTION (With Delay & Alert)
+  // 🚀 ALERT SENDER FUNCTION
   const sendTokenToWeb = () => {
-    if (expoPushToken && webViewRef.current) {
-      console.log("📡 Sending Token to Vercel App...");
-      
-      // Ye tumhe dikhayega ki Phone ne apna kaam kar diya hai
+    if (expoPushToken) {
       Alert.alert("Setup Complete", "Device ready for Push Notifications.");
-
-      // Delay lagaya hai taaki Vercel website puri load ho jaye
-      const script = `
-        setTimeout(function() {
-          try {
-            // Method A: Direct Call
-            if(typeof window.receiveTokenFromAndroid === 'function') {
-              window.receiveTokenFromAndroid('${expoPushToken}');
-            }
-            
-            // Method B: Event Listener Call
-            window.postMessage(JSON.stringify({ type: 'PUSH_TOKEN', token: '${expoPushToken}' }), '*');
-            document.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'PUSH_TOKEN', token: '${expoPushToken}' }) }));
-          } catch(e) {}
-        }, 2500); // 2.5 Seconds wait karega
-        true;
-      `;
-      webViewRef.current.injectJavaScript(script);
     }
   };
 
@@ -177,10 +163,11 @@ export default function App() {
       <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
       <WebView 
         ref={webViewRef}
-        source={{ uri: 'https://sos-safe-helpers.vercel.app/' }} 
+        // 🔥 THE MAGIC: Token direct URL me daal kar website kholenge
+        source={{ uri: expoPushToken ? `https://sos-safe-helpers.vercel.app/?token=${expoPushToken}` : 'https://sos-safe-helpers.vercel.app/' }} 
         style={styles.webview}
         originWhitelist={['*']}
-        onLoadEnd={sendTokenToWeb} // 🚀 Load hone ke baad token bhejega
+        onLoadEnd={sendTokenToWeb} 
         onMessage={(event) => {
           try {
             const data = JSON.parse(event.nativeEvent.data);

@@ -43,7 +43,6 @@ export default function SafeHelpApp() {
   const [cachedName, setCachedName] = useState("mr.");
 
   // 🚀 1. EMERGENCY BYPASS TIMER
-  // Agar Firebase 4 second tak jawaab nahi deta, toh app forcefully aage badh jayegi!
   useEffect(() => {
     const emergencyTimer = setTimeout(() => {
       setCurrentScreen((prev) => {
@@ -58,21 +57,21 @@ export default function SafeHelpApp() {
     return () => clearTimeout(emergencyTimer);
   }, [user]);
 
-  // 🔥 2. BULLETPROOF NATIVE BRIDGE (With Smart Backup)
+  // 🔥 2. THE ULTIMATE BYPASS: URL SE TOKEN PAKDO (Naya Logic)
   useEffect(() => {
-    // Method A: Direct Global Function
-    (window as any).receiveTokenFromAndroid = async (token: string) => {
-      if (token) {
-        console.log("✅ Token Caught ->", token);
-        // Hamesha local memory me save karo backup ke liye
-        localStorage.setItem("expo_push_token", token); 
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken = urlParams.get('token'); 
+      
+      if (urlToken && urlToken.includes("ExponentPushToken")) {
+        console.log("🎯 Token Caught from URL!", urlToken);
+        localStorage.setItem("expo_push_token", urlToken); 
         
-        // Agar user login hai, toh direct Firebase bhejo
         if (user && db) {
           try {
             const userRef = doc(db, "users", user.uid);
-            await setDoc(userRef, { 
-              pushToken: token,
+            setDoc(userRef, { 
+              pushToken: urlToken,
               lastTokenSync: serverTimestamp(),
               platform: "android"
             }, { merge: true });
@@ -81,39 +80,7 @@ export default function SafeHelpApp() {
           }
         }
       }
-    };
-
-    // Method B: Event Listeners
-    const handleNativeMessage = async (event: any) => {
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (data.type === "PUSH_TOKEN" && data.token) {
-          console.log("📡 Event Bridge: Token Caught ->", data.token);
-          // Hamesha local memory me save karo backup ke liye
-          localStorage.setItem("expo_push_token", data.token); 
-          
-          if (user && db) {
-            const userRef = doc(db, "users", user.uid);
-            await setDoc(userRef, { 
-              pushToken: data.token,
-              lastTokenSync: serverTimestamp(),
-              platform: "android"
-            }, { merge: true });
-          }
-        }
-      } catch (e) {
-        // Silently ignore unrelated web messages
-      }
-    };
-
-    window.addEventListener("message", handleNativeMessage);
-    document.addEventListener("message", handleNativeMessage);
-
-    return () => {
-      window.removeEventListener("message", handleNativeMessage);
-      document.removeEventListener("message", handleNativeMessage);
-      delete (window as any).receiveTokenFromAndroid;
-    };
+    }
   }, [user, db]);
 
   // 🔥 3. AUTO-SYNC: JAISE HI LOGIN HO, BACKUP TOKEN FIREBASE BHEJO
