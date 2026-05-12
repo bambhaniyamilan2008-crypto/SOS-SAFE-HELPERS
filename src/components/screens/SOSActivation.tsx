@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { MapPin, X, Check, ShieldAlert } from "lucide-react";
+import { MapPin, X, Check, ShieldAlert, Shield, Activity, Flame, LifeBuoy } from "lucide-react"; // ✅ Naye Icons add kiye
 
-// 🔥 FIREBASE IMPORTS
-import { collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs } from "firebase/firestore";
+// 🔥 FIREBASE IMPORTS (getDoc add kiya)
+import { collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
-import { useUser, useDoc } from "@/firebase"; // ✅ Naya Import
+import { useUser } from "@/firebase";
 
 interface SOSActivationProps {
   onCancel: () => void;
@@ -16,16 +16,36 @@ interface SOSActivationProps {
 }
 
 export default function SOSActivation({ onCancel, onActivated, t }: SOSActivationProps) {
-  const { user } = useUser(); // ✅ User uthaya
+  const { user } = useUser();
   
   const [countdown, setCountdown] = useState(3);
-  const [locationStatus, setLocationStatus] = useState(t.fetchingLocation);
-  const [messageStatus, setMessageStatus] = useState(t.preparingAlert);
+  const [locationStatus, setLocationStatus] = useState(t.fetchingLocation || "Fetching Location...");
+  const [messageStatus, setMessageStatus] = useState(t.preparingAlert || "Preparing Alert...");
+  
+  // 🌟 NAYA STATE: For Smart Logic
+  const [userDisability, setUserDisability] = useState("None");
+  const [showCategories, setShowCategories] = useState(false);
+  const [timerActive, setTimerActive] = useState(true);
   
   const hasSpokenRef = useRef(false);
   const isActionDoneRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null); 
   const alertIdRef = useRef<string | null>(null);
+
+  // 🌟 DATABASE SE DISABILITY CHECK KARO CHUPKE SE
+  useEffect(() => {
+    const fetchDisability = async () => {
+      if (user?.uid && db) {
+        try {
+          const userSnap = await getDoc(doc(db, "users", user.uid));
+          if (userSnap.exists() && userSnap.data().disabilityType) {
+            setUserDisability(userSnap.data().disabilityType);
+          }
+        } catch (error) { console.error("Disability fetch error:", error); }
+      }
+    };
+    fetchDisability();
+  }, [user]);
 
   const speakSOS = () => {
     const API_KEY = "66def89da92b48fbbc5ee6b34eab3456"; 
@@ -38,10 +58,9 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     } catch (error) { console.error("Voice Error:", error); }
   };
 
-  // 🚀 ALERT SEND FUNCTION
-  const fireDashboardAlert = async () => {
+  // 🚀 ALERT SEND FUNCTION (NOW UPGRADED WITH CATEGORY)
+  const fireDashboardAlert = async (alertCategory = "SOS Activated") => {
     try {
-      // 🔥 GOD MODE: Cache aur Profile se asli naam nikalna
       let finalName = user?.displayName || "Unknown User";
       let finalPhone = "Not Provided";
       const finalUserId = user?.uid || "unknown_id";
@@ -57,22 +76,34 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         }
       }
 
-      // 1. Bina GPS wait kiye turant alert bhejo (ASLI NAAM KE SATH)
+      // 🔥 DASHBOARD MAGIC: Name ke aage label laga do taaki dashboard mein seedha dikhe!
+      let displayPrefix = "";
+      if (alertCategory === "🔴 HIGH URGENCY: Visually Impaired") {
+         displayPrefix = "🔴 [BLIND SOS] ";
+      } else if (alertCategory === "🚓 Police / Threat") {
+         displayPrefix = "🚓 [POLICE] ";
+      } else if (alertCategory === "🚑 Medical / Ambulance") {
+         displayPrefix = "🚑 [MEDICAL] ";
+      } else if (alertCategory === "🔥 Fire / Accident") {
+         displayPrefix = "🔥 [FIRE] ";
+      } else if (alertCategory === "🆘 General Help") {
+         displayPrefix = "🆘 [GENERAL] ";
+      }
+
       const docRef = await addDoc(collection(db, "alerts"), {
-        userName: finalName, 
+        userName: displayPrefix + finalName, 
         userId: finalUserId, 
         phone: finalPhone, 
         status: "active",
         timestamp: serverTimestamp(),
-        type: "Panic Button",
+        type: alertCategory, 
         lat: null, 
         lng: null
       });
       
       alertIdRef.current = docRef.id;
-      console.log("🚨 Alert Live! ID:", docRef.id, "By:", finalName);
+      console.log("🚨 Alert Live! ID:", docRef.id, "Type:", alertCategory);
 
-      // 2. Background mein GPS location update karo
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const lat = position.coords.latitude;
@@ -86,9 +117,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         (err) => console.error("GPS Error:", err),
         { enableHighAccuracy: true, timeout: 5000 }
       );
-    } catch (e) { 
-      console.error("Firebase Error: ", e); 
-    }
+    } catch (e) { console.error("Firebase Error: ", e); }
   };
 
   // 🔥 UNBLOCKED RESOLVE FUNCTION (I AM SAFE Button)
@@ -97,51 +126,48 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     
     try {
       console.log("🚨 I AM SAFE Button Pressed! Searching Firebase...");
-      
-      // 1. Database se active alert dhundho
       const q = query(collection(db, "alerts"), where("status", "==", "active"));
       const querySnapshot = await getDocs(q);
 
-      console.log("Active Alerts Found:", querySnapshot.size);
-
-      if (querySnapshot.empty) {
-        alert("⚠️ App ko Firebase mein koi 'active' alert nahi mila!");
-      } else {
-        // 2. Sabko zabardasti 'resolved' karo
+      if (!querySnapshot.empty) {
         const updatePromises = querySnapshot.docs.map((alertDoc) => {
-          const docReference = doc(db, "alerts", alertDoc.id);
-          return updateDoc(docReference, {
+          return updateDoc(doc(db, "alerts", alertDoc.id), {
             status: "resolved",
             resolvedAt: serverTimestamp()
           });
         });
         
         await Promise.all(updatePromises);
-        console.log("✅ All alerts marked as resolved!");
-        
-        // 🔥 Screen par success dikhao
         alert("✅ Dashboard Green Ho Gaya Hoga! Firebase Updated.");
       }
     } catch (error: any) {
       console.error("🔥 UPDATE ERROR:", error);
-      alert("Error: " + error.message);
     }
 
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("activeAlertId");
-    }
+    if (typeof window !== "undefined") localStorage.removeItem("activeAlertId");
     
-    // 1 second ka wait taaki database 100% update ho jaye, phir screen band ho
-    setTimeout(() => {
-      onCancel(); 
-    }, 1000); 
+    setTimeout(() => { onCancel(); }, 1000); 
   };
 
-  const handleSendNow = () => {
-    isActionDoneRef.current = true; 
-    if (audioRef.current) audioRef.current.pause();
-    fireDashboardAlert();
+  // 🌟 NAYA LOGIC: Specific button dabne par
+  const triggerSpecificEmergency = (type: string) => {
+    isActionDoneRef.current = true;
+    fireDashboardAlert(type);
     onActivated();
+  };
+
+  // 🌟 SEND NOW Button Logic 
+  const handleSendNow = () => {
+    if (audioRef.current) audioRef.current.pause();
+    setTimerActive(false); 
+
+    if (userDisability === "Visually Impaired") {
+      isActionDoneRef.current = true;
+      fireDashboardAlert("🔴 HIGH URGENCY: Visually Impaired");
+      onActivated();
+    } else {
+      setShowCategories(true);
+    }
   };
 
   useEffect(() => {
@@ -154,18 +180,25 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     return () => clearTimeout(audioTimer);
   }, []);
 
+  // 🌟 TIMER LOGIC (UPDATED WITH SMART OVERRIDE)
   useEffect(() => {
-    if (isActionDoneRef.current) return;
+    if (!timerActive || isActionDoneRef.current) return;
 
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
     } else {
-      isActionDoneRef.current = true;
-      fireDashboardAlert();
-      onActivated();
+      setTimerActive(false);
+      // COUNTDOWN ZERO HUA - SMART CHECK!
+      if (userDisability === "Visually Impaired") {
+        isActionDoneRef.current = true;
+        fireDashboardAlert("🔴 HIGH URGENCY: Visually Impaired");
+        onActivated();
+      } else {
+        setShowCategories(true); // Normal user ko categories dikhao
+      }
     }
-  }, [countdown, onActivated]);
+  }, [countdown, timerActive, userDisability, onActivated]);
 
   return (
     <div className="flex flex-col min-h-screen p-8 justify-between items-center bg-black text-white relative">
@@ -178,7 +211,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
           </div>
         </div>
         <h1 className="text-4xl font-black tracking-tight uppercase text-red-600 animate-pulse">
-          {t.sosActivated}
+          {t.sosActivated || "SOS Activated"}
         </h1>
         <div className="space-y-1 text-red-100">
           <p className="text-lg font-bold">{messageStatus}</p>
@@ -189,31 +222,58 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         </div>
       </div>
 
-      <div className="relative z-10 flex flex-col items-center justify-center flex-1 w-full py-12">
-        <div className="relative w-64 h-64 rounded-full border-[12px] border-red-600/20 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full border-[12px] border-red-600 border-t-transparent animate-spin-slow"></div>
-          <span className="text-9xl font-black text-red-600">
-            {countdown}
-          </span>
+      {/* 🌟 CONDITIONAL UI: Timer ya Category Buttons */}
+      {showCategories ? (
+        <div className="relative z-10 w-full flex flex-col items-center justify-center flex-1 py-8 animate-in zoom-in duration-300">
+          <h2 className="text-xl font-black uppercase text-red-500 mb-6 tracking-widest text-center animate-pulse">Select Emergency Type</h2>
+          <div className="grid grid-cols-2 gap-4 w-full max-w-xs mx-auto">
+            <Button onClick={() => triggerSpecificEmergency("🚓 Police / Threat")} className="h-28 bg-blue-600 hover:bg-blue-700 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
+              <Shield className="w-10 h-10 text-white mb-2" />
+              <span className="text-xs font-black uppercase text-white tracking-widest">Police</span>
+            </Button>
+            <Button onClick={() => triggerSpecificEmergency("🚑 Medical / Ambulance")} className="h-28 bg-rose-600 hover:bg-rose-700 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
+              <Activity className="w-10 h-10 text-white mb-2" />
+              <span className="text-xs font-black uppercase text-white tracking-widest">Medical</span>
+            </Button>
+            <Button onClick={() => triggerSpecificEmergency("🔥 Fire / Accident")} className="h-28 bg-orange-600 hover:bg-orange-700 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
+              <Flame className="w-10 h-10 text-white mb-2" />
+              <span className="text-xs font-black uppercase text-white tracking-widest">Fire</span>
+            </Button>
+            <Button onClick={() => triggerSpecificEmergency("🆘 General Help")} className="h-28 bg-slate-700 hover:bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
+              <LifeBuoy className="w-10 h-10 text-white mb-2" />
+              <span className="text-xs font-black uppercase text-white tracking-widest">General</span>
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="relative z-10 flex flex-col items-center justify-center flex-1 w-full py-12">
+          <div className="relative w-64 h-64 rounded-full border-[12px] border-red-600/20 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full border-[12px] border-red-600 border-t-transparent animate-spin-slow"></div>
+            <span className="text-9xl font-black text-red-600">{countdown}</span>
+          </div>
+        </div>
+      )}
 
-      <div className="relative z-10 w-full grid grid-cols-2 gap-4 pb-12">
+      {/* 🌟 BOTTOM BUTTONS */}
+      <div className={`relative z-10 w-full pb-12 ${showCategories ? 'flex justify-center' : 'grid grid-cols-2 gap-4'}`}>
         <Button 
           variant="ghost" 
           onClick={handleCancel} 
-          className="h-24 rounded-[2rem] border-2 border-white/20 text-white text-xl font-black bg-white/5 hover:bg-red-600/20 active:scale-95 transition-all flex flex-col"
+          className={`h-24 rounded-[2rem] border-2 border-white/20 text-white text-xl font-black bg-white/5 hover:bg-red-600/20 active:scale-95 transition-all flex flex-col ${showCategories ? 'w-full max-w-xs' : ''}`}
         >
           <X className="w-8 h-8 mb-1" />
           <span className="text-xs uppercase">I AM SAFE</span>
         </Button>
-        <Button 
-          onClick={handleSendNow} 
-          className="h-24 rounded-[2rem] bg-red-600 text-white text-xl font-black shadow-xl shadow-red-900/40 hover:bg-red-700 active:scale-95 transition-all flex flex-col"
-        >
-          <Check className="w-8 h-8 mb-1" />
-          <span className="text-xs uppercase">{t.sendNow}</span>
-        </Button>
+        
+        {!showCategories && (
+          <Button 
+            onClick={handleSendNow} 
+            className="h-24 rounded-[2rem] bg-red-600 text-white text-xl font-black shadow-xl shadow-red-900/40 hover:bg-red-700 active:scale-95 transition-all flex flex-col"
+          >
+            <Check className="w-8 h-8 mb-1" />
+            <span className="text-xs uppercase">{t.sendNow || "SEND NOW"}</span>
+          </Button>
+        )}
       </div>
 
       <style jsx global>{`
