@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { MapPin, X, Check, ShieldAlert, Shield, Activity, Flame, LifeBuoy } from "lucide-react"; 
+import { MapPin, X, Check, ShieldAlert, Shield, Activity, Flame, LifeBuoy, MessageSquare } from "lucide-react"; 
 
 // 🔥 FIREBASE IMPORTS
 import { collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 import { useUser } from "@/firebase";
+
+// ❌ EXPO IMPORTS HATA DIYE! WEB MEIN INKI ZAROORAT NAHI HAI.
 
 interface SOSActivationProps {
   onCancel: () => void;
@@ -22,7 +24,6 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   const [locationStatus, setLocationStatus] = useState(t.fetchingLocation || "Fetching Location...");
   const [messageStatus, setMessageStatus] = useState(t.preparingAlert || "Preparing Alert...");
   
-  // 🌟 STATE: For Smart Logic
   const [userDisability, setUserDisability] = useState("None");
   const [showCategories, setShowCategories] = useState(false);
   const [timerActive, setTimerActive] = useState(true);
@@ -32,7 +33,15 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   const audioRef = useRef<HTMLAudioElement | null>(null); 
   const alertIdRef = useRef<string | null>(null);
 
-  // 🌟 DATABASE SE DISABILITY CHECK KARO CHUPKE SE
+  // 🌟 SETUP SE STARRED (PRIMARY) CONTACT NIKALNA
+  const getStarredContact = () => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('safehelp_fast_contact');
+      if (saved) return JSON.parse(saved);
+    }
+    return null;
+  };
+
   useEffect(() => {
     const fetchDisability = async () => {
       if (user?.uid && db) {
@@ -41,9 +50,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
           if (userSnap.exists() && userSnap.data().disabilityType) {
             setUserDisability(userSnap.data().disabilityType);
           }
-        } catch (error) { 
-          console.error("Disability fetch error:", error); 
-        }
+        } catch (error) { console.error("Disability fetch error:", error); }
       }
     };
     fetchDisability();
@@ -57,13 +64,65 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       audio.volume = 1.0;
       audioRef.current = audio;
       audio.play().catch(() => console.log("Voice blocked by browser"));
-    } catch (error) { 
-      console.error("Voice Error:", error); 
+    } catch (error) { console.error("Voice Error:", error); }
+  };
+
+  // 🚀 MAIN LOGIC: CHECK INTERNET AND FIRE ALERT (WEB NATIVE)
+  const checkInternetAndFire = async (category = "SOS Activated") => {
+    try {
+      // ✅ WEB NATIVE INTERNET CHECK (No package needed)
+      if (typeof window !== 'undefined' && navigator.onLine) {
+        // 🌐 ONLINE: Seedha Firebase Dashboard pe bhejo
+        fireDashboardAlert(category);
+        onActivated(); // Tracking page pe jao
+      } else {
+        // 📶 OFFLINE: SMS Fallback chalao
+        handleOfflineSMS(category);
+      }
+    } catch (error) {
+      console.error("Network check failed, defaulting to offline SMS", error);
+      handleOfflineSMS(category);
     }
   };
 
-  // 🚀 ALERT SEND FUNCTION (CLEAN NAME VERSION)
-  const fireDashboardAlert = async (alertCategory = "SOS Activated") => {
+  // 📶 OFFLINE SMS HANDLER (WEB NATIVE)
+  const handleOfflineSMS = async (category: string) => {
+    setMessageStatus("OFFLINE MODE: Opening SMS...");
+    const starred = getStarredContact();
+    
+    if (!starred) {
+       alert("No Starred Contact found! Please setup contacts first.");
+       onCancel();
+       return;
+    }
+
+    // Get Offline GPS Coords
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=$${latitude},${longitude}`;
+        const smsBody = `🚨 EMERGENCY ALERT! 🚨\nType: ${category}\nI need urgent help. My current location:\n📍 ${googleMapsLink}`;
+
+        // ✅ WEB NATIVE SMS OPENER (No package needed)
+        window.location.href = `sms:${starred.phone}?body=${encodeURIComponent(smsBody)}`;
+        
+        // SMS app open hone ke baad Tracking Screen par le jao
+        onActivated();
+      },
+      (err) => {
+        alert("GPS Error: Could not get location for SMS.");
+        // Agar GPS fail bhi ho jaye, tab bhi SMS kholega bina location ke
+        const backupBody = `🚨 EMERGENCY ALERT! 🚨\nType: ${category}\nI need urgent help! (Location unavailable due to GPS error)`;
+        window.location.href = `sms:${starred.phone}?body=${encodeURIComponent(backupBody)}`;
+        
+        onActivated();
+      },
+      { enableHighAccuracy: true, timeout: 5000 }
+    );
+  };
+
+  // 🌐 ONLINE DASHBOARD SENDER
+  const fireDashboardAlert = async (alertCategory: string) => {
     try {
       let finalName = user?.displayName || "Unknown User";
       let finalPhone = "Not Provided";
@@ -80,48 +139,38 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         }
       }
 
-      // 🌟 FIXED: Dashboard mein sirf Name bhejenge, Prefix emoji nahi!
       const docRef = await addDoc(collection(db, "alerts"), {
-        userName: finalName, // ✅ Ekdum clean naam
+        userName: finalName, 
         userId: finalUserId, 
         phone: finalPhone, 
         status: "active",
         timestamp: serverTimestamp(),
-        type: alertCategory, // Badge ka logic yahan se chalega
+        type: alertCategory, 
         lat: null, 
         lng: null
       });
       
       alertIdRef.current = docRef.id;
-      console.log("🚨 Alert Live! ID:", docRef.id, "Type:", alertCategory);
 
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
-          setLocationStatus(t.locationAttached || "Location Attached");
-          
           if (alertIdRef.current) {
             await updateDoc(doc(db, "alerts", alertIdRef.current), { lat, lng });
           }
         },
-        (err) => console.error("GPS Error:", err),
-        { enableHighAccuracy: true, timeout: 5000 }
+        (err) => console.error("GPS Error: ", err),
+        { enableHighAccuracy: true }
       );
-    } catch (e) { 
-      console.error("Firebase Error: ", e); 
-    }
+    } catch (e) { console.error("Firebase Error: ", e); }
   };
 
-  // 🔥 UNBLOCKED RESOLVE FUNCTION (I AM SAFE Button)
   const handleCancel = async () => {
     if (audioRef.current) audioRef.current.pause();
-    
     try {
-      console.log("🚨 I AM SAFE Button Pressed! Searching Firebase...");
       const q = query(collection(db, "alerts"), where("status", "==", "active"));
       const querySnapshot = await getDocs(q);
-
       if (!querySnapshot.empty) {
         const updatePromises = querySnapshot.docs.map((alertDoc) => {
           return updateDoc(doc(db, "alerts", alertDoc.id), {
@@ -129,71 +178,43 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
             resolvedAt: serverTimestamp()
           });
         });
-        
         await Promise.all(updatePromises);
-        alert("✅ Dashboard Green Ho Gaya Hoga! Firebase Updated.");
       }
-    } catch (error: any) {
-      console.error("🔥 UPDATE ERROR:", error);
-    }
-
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("activeAlertId");
-    }
-    
-    setTimeout(() => { onCancel(); }, 1000); 
+    } catch (error) {}
+    onCancel(); 
   };
 
-  // 🌟 NAYA LOGIC: Specific button dabne par
   const triggerSpecificEmergency = (type: string) => {
     isActionDoneRef.current = true;
-    fireDashboardAlert(type);
-    onActivated();
+    checkInternetAndFire(type);
   };
 
-  // 🌟 SEND NOW Button Logic 
   const handleSendNow = () => {
     if (audioRef.current) audioRef.current.pause();
     setTimerActive(false); 
-
     if (userDisability === "Visually Impaired") {
       isActionDoneRef.current = true;
-      fireDashboardAlert("🔴 HIGH URGENCY: Visually Impaired");
-      onActivated();
+      checkInternetAndFire("🔴 HIGH URGENCY: Visually Impaired");
     } else {
       setShowCategories(true);
     }
   };
 
   useEffect(() => {
-    const audioTimer = setTimeout(() => {
-      if (!hasSpokenRef.current) {
-        speakSOS();
-        hasSpokenRef.current = true;
-      }
-    }, 500);
-    return () => clearTimeout(audioTimer);
-  }, []);
-
-  // 🌟 TIMER LOGIC (UPDATED WITH SMART OVERRIDE)
-  useEffect(() => {
     if (!timerActive || isActionDoneRef.current) return;
-
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
     } else {
       setTimerActive(false);
-      // COUNTDOWN ZERO HUA - SMART CHECK!
       if (userDisability === "Visually Impaired") {
         isActionDoneRef.current = true;
-        fireDashboardAlert("🔴 HIGH URGENCY: Visually Impaired");
-        onActivated();
+        checkInternetAndFire("🔴 HIGH URGENCY: Visually Impaired");
       } else {
-        setShowCategories(true); // Normal user ko categories dikhao
+        setShowCategories(true);
       }
     }
-  }, [countdown, timerActive, userDisability, onActivated]);
+  }, [countdown, timerActive, userDisability]);
 
   return (
     <div className="flex flex-col min-h-screen p-8 justify-between items-center bg-black text-white relative">
@@ -217,24 +238,23 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         </div>
       </div>
 
-      {/* 🌟 CONDITIONAL UI: Timer ya Category Buttons */}
       {showCategories ? (
         <div className="relative z-10 w-full flex flex-col items-center justify-center flex-1 py-8 animate-in zoom-in duration-300">
-          <h2 className="text-xl font-black uppercase text-red-500 mb-6 tracking-widest text-center animate-pulse">Select Emergency Type</h2>
+          <h2 className="text-xl font-black uppercase text-red-500 mb-6 tracking-widest text-center">Select Type</h2>
           <div className="grid grid-cols-2 gap-4 w-full max-w-xs mx-auto">
-            <Button onClick={() => triggerSpecificEmergency("🚓 Police / Threat")} className="h-28 bg-blue-600 hover:bg-blue-700 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
+            <Button onClick={() => triggerSpecificEmergency("🚓 Police / Threat")} className="h-28 bg-blue-600 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
               <Shield className="w-10 h-10 text-white mb-2" />
               <span className="text-xs font-black uppercase text-white tracking-widest">Police</span>
             </Button>
-            <Button onClick={() => triggerSpecificEmergency("🚑 Medical / Ambulance")} className="h-28 bg-rose-600 hover:bg-rose-700 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
+            <Button onClick={() => triggerSpecificEmergency("🚑 Medical / Ambulance")} className="h-28 bg-rose-600 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
               <Activity className="w-10 h-10 text-white mb-2" />
               <span className="text-xs font-black uppercase text-white tracking-widest">Medical</span>
             </Button>
-            <Button onClick={() => triggerSpecificEmergency("🔥 Fire / Accident")} className="h-28 bg-orange-600 hover:bg-orange-700 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
+            <Button onClick={() => triggerSpecificEmergency("🔥 Fire / Accident")} className="h-28 bg-orange-600 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
               <Flame className="w-10 h-10 text-white mb-2" />
               <span className="text-xs font-black uppercase text-white tracking-widest">Fire</span>
             </Button>
-            <Button onClick={() => triggerSpecificEmergency("🆘 General Help")} className="h-28 bg-slate-700 hover:bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
+            <Button onClick={() => triggerSpecificEmergency("🆘 General Help")} className="h-28 bg-slate-700 rounded-[2rem] flex flex-col items-center justify-center shadow-lg active:scale-95 transition-all">
               <LifeBuoy className="w-10 h-10 text-white mb-2" />
               <span className="text-xs font-black uppercase text-white tracking-widest">General</span>
             </Button>
@@ -249,7 +269,6 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         </div>
       )}
 
-      {/* 🌟 BOTTOM BUTTONS */}
       <div className={`relative z-10 w-full pb-12 ${showCategories ? 'flex justify-center' : 'grid grid-cols-2 gap-4'}`}>
         <Button 
           variant="ghost" 
