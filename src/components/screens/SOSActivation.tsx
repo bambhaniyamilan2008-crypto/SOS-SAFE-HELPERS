@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { MapPin, X, Check, ShieldAlert, Shield, Activity, Flame, LifeBuoy } from "lucide-react"; // ✅ Naye Icons add kiye
+import { MapPin, X, Check, ShieldAlert, Shield, Activity, Flame, LifeBuoy } from "lucide-react"; 
 
-// 🔥 FIREBASE IMPORTS (getDoc add kiya)
+// 🔥 FIREBASE IMPORTS
 import { collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 import { useUser } from "@/firebase";
@@ -22,7 +22,7 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
   const [locationStatus, setLocationStatus] = useState(t.fetchingLocation || "Fetching Location...");
   const [messageStatus, setMessageStatus] = useState(t.preparingAlert || "Preparing Alert...");
   
-  // 🌟 NAYA STATE: For Smart Logic
+  // 🌟 STATE: For Smart Logic
   const [userDisability, setUserDisability] = useState("None");
   const [showCategories, setShowCategories] = useState(false);
   const [timerActive, setTimerActive] = useState(true);
@@ -41,7 +41,9 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
           if (userSnap.exists() && userSnap.data().disabilityType) {
             setUserDisability(userSnap.data().disabilityType);
           }
-        } catch (error) { console.error("Disability fetch error:", error); }
+        } catch (error) { 
+          console.error("Disability fetch error:", error); 
+        }
       }
     };
     fetchDisability();
@@ -55,10 +57,12 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       audio.volume = 1.0;
       audioRef.current = audio;
       audio.play().catch(() => console.log("Voice blocked by browser"));
-    } catch (error) { console.error("Voice Error:", error); }
+    } catch (error) { 
+      console.error("Voice Error:", error); 
+    }
   };
 
-  // 🚀 ALERT SEND FUNCTION (NOW UPGRADED WITH CATEGORY)
+  // 🚀 ALERT SEND FUNCTION (CLEAN NAME VERSION)
   const fireDashboardAlert = async (alertCategory = "SOS Activated") => {
     try {
       let finalName = user?.displayName || "Unknown User";
@@ -76,27 +80,14 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         }
       }
 
-      // 🔥 DASHBOARD MAGIC: Name ke aage label laga do taaki dashboard mein seedha dikhe!
-      let displayPrefix = "";
-      if (alertCategory === "🔴 HIGH URGENCY: Visually Impaired") {
-         displayPrefix = "🔴 [BLIND SOS] ";
-      } else if (alertCategory === "🚓 Police / Threat") {
-         displayPrefix = "🚓 [POLICE] ";
-      } else if (alertCategory === "🚑 Medical / Ambulance") {
-         displayPrefix = "🚑 [MEDICAL] ";
-      } else if (alertCategory === "🔥 Fire / Accident") {
-         displayPrefix = "🔥 [FIRE] ";
-      } else if (alertCategory === "🆘 General Help") {
-         displayPrefix = "🆘 [GENERAL] ";
-      }
-
+      // 🌟 FIXED: Dashboard mein sirf Name bhejenge, Prefix emoji nahi!
       const docRef = await addDoc(collection(db, "alerts"), {
-        userName: displayPrefix + finalName, 
+        userName: finalName, // ✅ Ekdum clean naam
         userId: finalUserId, 
         phone: finalPhone, 
         status: "active",
         timestamp: serverTimestamp(),
-        type: alertCategory, 
+        type: alertCategory, // Badge ka logic yahan se chalega
         lat: null, 
         lng: null
       });
@@ -117,7 +108,9 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
         (err) => console.error("GPS Error:", err),
         { enableHighAccuracy: true, timeout: 5000 }
       );
-    } catch (e) { console.error("Firebase Error: ", e); }
+    } catch (e) { 
+      console.error("Firebase Error: ", e); 
+    }
   };
 
   // 🔥 UNBLOCKED RESOLVE FUNCTION (I AM SAFE Button)
@@ -144,7 +137,9 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
       console.error("🔥 UPDATE ERROR:", error);
     }
 
-    if (typeof window !== "undefined") localStorage.removeItem("activeAlertId");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("activeAlertId");
+    }
     
     setTimeout(() => { onCancel(); }, 1000); 
   };
