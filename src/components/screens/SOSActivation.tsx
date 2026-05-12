@@ -2,14 +2,12 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { MapPin, X, Check, ShieldAlert, Shield, Activity, Flame, LifeBuoy, MessageSquare } from "lucide-react"; 
+import { MapPin, X, Check, ShieldAlert, Shield, Activity, Flame, LifeBuoy } from "lucide-react"; 
 
 // 🔥 FIREBASE IMPORTS
 import { collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase"; 
 import { useUser } from "@/firebase";
-
-// ❌ EXPO IMPORTS HATA DIYE! WEB MEIN INKI ZAROORAT NAHI HAI.
 
 interface SOSActivationProps {
   onCancel: () => void;
@@ -67,27 +65,53 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
     } catch (error) { console.error("Voice Error:", error); }
   };
 
-  // 🚀 MAIN LOGIC: CHECK INTERNET AND FIRE ALERT (WEB NATIVE)
-  const checkInternetAndFire = async (category = "SOS Activated") => {
-    try {
-      // ✅ WEB NATIVE INTERNET CHECK (No package needed)
-      if (typeof window !== 'undefined' && navigator.onLine) {
-        // 🌐 ONLINE: Seedha Firebase Dashboard pe bhejo
-        fireDashboardAlert(category);
-        onActivated(); // Tracking page pe jao
-      } else {
-        // 📶 OFFLINE: SMS Fallback chalao
-        handleOfflineSMS(category);
+  // 🌐 ONLINE DASHBOARD SENDER (Ab ye error THROW karega taaki Fail-Safe chal sake)
+  const fireDashboardAlert = async (alertCategory: string) => {
+    let finalName = user?.displayName || "Unknown User";
+    let finalPhone = "Not Provided";
+    const finalUserId = user?.uid || "unknown_id";
+
+    if (typeof window !== 'undefined') {
+      const cachedProfile = localStorage.getItem('safehelp_profile_cache');
+      if (cachedProfile) {
+        try {
+          const parsed = JSON.parse(cachedProfile);
+          if (parsed.name) finalName = parsed.name;
+          if (parsed.phone) finalPhone = parsed.phone;
+        } catch (e) {}
       }
-    } catch (error) {
-      console.error("Network check failed, defaulting to offline SMS", error);
-      handleOfflineSMS(category);
     }
+
+    // Agar internet slow hai aur Firebase fail hota hai, toh ye Error phekega
+    const docRef = await addDoc(collection(db, "alerts"), {
+      userName: finalName, 
+      userId: finalUserId, 
+      phone: finalPhone, 
+      status: "active",
+      timestamp: serverTimestamp(),
+      type: alertCategory, 
+      lat: null, 
+      lng: null
+    });
+    
+    alertIdRef.current = docRef.id;
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        if (alertIdRef.current) {
+          await updateDoc(doc(db, "alerts", alertIdRef.current), { lat, lng });
+        }
+      },
+      (err) => console.error("GPS Error: ", err),
+      { enableHighAccuracy: true }
+    );
   };
 
   // 📶 OFFLINE SMS HANDLER (WEB NATIVE)
-  const handleOfflineSMS = async (category: string) => {
-    setMessageStatus("OFFLINE MODE: Opening SMS...");
+  const handleOfflineSMS = (category: string) => {
+    setMessageStatus("NETWORK ISSUE: Opening SMS...");
     const starred = getStarredContact();
     
     if (!starred) {
@@ -96,89 +120,58 @@ export default function SOSActivation({ onCancel, onActivated, t }: SOSActivatio
        return;
     }
 
-    // Get Offline GPS Coords
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=$${latitude},${longitude}`;
-        const smsBody = `🚨 EMERGENCY ALERT! 🚨\nType: ${category}\nI need urgent help. My current location:\n📍 ${googleMapsLink}`;
+        const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+        const smsBody = `🚨 EMERGENCY ALERT! 🚨\nType: ${category}\nI need urgent help. My location:\n📍 ${googleMapsLink}`;
 
-        // ✅ WEB NATIVE SMS OPENER (No package needed)
         window.location.href = `sms:${starred.phone}?body=${encodeURIComponent(smsBody)}`;
-        
-        // SMS app open hone ke baad Tracking Screen par le jao
         onActivated();
       },
       (err) => {
-        alert("GPS Error: Could not get location for SMS.");
-        // Agar GPS fail bhi ho jaye, tab bhi SMS kholega bina location ke
-        const backupBody = `🚨 EMERGENCY ALERT! 🚨\nType: ${category}\nI need urgent help! (Location unavailable due to GPS error)`;
+        const backupBody = `🚨 EMERGENCY ALERT! 🚨\nType: ${category}\nI need urgent help! (Location unavailable)`;
         window.location.href = `sms:${starred.phone}?body=${encodeURIComponent(backupBody)}`;
-        
         onActivated();
       },
       { enableHighAccuracy: true, timeout: 5000 }
     );
   };
 
-  // 🌐 ONLINE DASHBOARD SENDER
-  const fireDashboardAlert = async (alertCategory: string) => {
-    try {
-      let finalName = user?.displayName || "Unknown User";
-      let finalPhone = "Not Provided";
-      const finalUserId = user?.uid || "unknown_id";
-
-      if (typeof window !== 'undefined') {
-        const cachedProfile = localStorage.getItem('safehelp_profile_cache');
-        if (cachedProfile) {
-          try {
-            const parsed = JSON.parse(cachedProfile);
-            if (parsed.name) finalName = parsed.name;
-            if (parsed.phone) finalPhone = parsed.phone;
-          } catch (e) {}
-        }
+  // 🚀 MAIN LOGIC: FAIL-SAFE INTERNET CHECK
+  const checkInternetAndFire = async (category = "SOS Activated") => {
+    if (typeof window !== 'undefined' && navigator.onLine) {
+      try {
+        setMessageStatus("Connecting to Rescue Servers...");
+        // Pehle Firebase try karo
+        await fireDashboardAlert(category);
+        onActivated(); 
+      } catch (error) {
+        // 🌟 FAIL-SAFE TRIGGERED: Agar Firebase Token/Disconnect error de, toh turant SMS pe jao
+        console.warn("Firebase failed! Switching to Offline SMS...", error);
+        handleOfflineSMS(category);
       }
-
-      const docRef = await addDoc(collection(db, "alerts"), {
-        userName: finalName, 
-        userId: finalUserId, 
-        phone: finalPhone, 
-        status: "active",
-        timestamp: serverTimestamp(),
-        type: alertCategory, 
-        lat: null, 
-        lng: null
-      });
-      
-      alertIdRef.current = docRef.id;
-
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          if (alertIdRef.current) {
-            await updateDoc(doc(db, "alerts", alertIdRef.current), { lat, lng });
-          }
-        },
-        (err) => console.error("GPS Error: ", err),
-        { enableHighAccuracy: true }
-      );
-    } catch (e) { console.error("Firebase Error: ", e); }
+    } else {
+      // Agar net pehle se completely OFF hai
+      handleOfflineSMS(category);
+    }
   };
 
   const handleCancel = async () => {
     if (audioRef.current) audioRef.current.pause();
     try {
-      const q = query(collection(db, "alerts"), where("status", "==", "active"));
-      const querySnapshot = await getDocs(q);
-      if (!querySnapshot.empty) {
-        const updatePromises = querySnapshot.docs.map((alertDoc) => {
-          return updateDoc(doc(db, "alerts", alertDoc.id), {
-            status: "resolved",
-            resolvedAt: serverTimestamp()
+      if (navigator.onLine) {
+        const q = query(collection(db, "alerts"), where("status", "==", "active"));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const updatePromises = querySnapshot.docs.map((alertDoc) => {
+            return updateDoc(doc(db, "alerts", alertDoc.id), {
+              status: "resolved",
+              resolvedAt: serverTimestamp()
+            });
           });
-        });
-        await Promise.all(updatePromises);
+          await Promise.all(updatePromises);
+        }
       }
     } catch (error) {}
     onCancel(); 
